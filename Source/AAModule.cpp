@@ -302,8 +302,22 @@ void AATest::Process(double time)
    
    mWriteBuffer.Clear();
    ChannelBuffer* out = &mWriteBuffer;
-    
-   aa_module_compute_zero_one(aaModule, bufferSize, out->GetChannel(0));
+
+   // Now handle computing audio in AA world
+   if (mNumInputs > 0) {
+      if (mNumInputs == 2) {
+
+      }
+      else {
+
+      }
+   }
+   else if (mNumOutputs == 2) {
+      aa_module_compute_zero_two_non(aaModule, bufferSize, out->GetChannel(0), out->GetChannel(1));
+   } 
+   else {
+      aa_module_compute_zero_one(aaModule, bufferSize, out->GetChannel(0));
+   }
    
    SyncOutputBuffer(mWriteBuffer.NumActiveChannels());
    for (int ch=0; ch<mWriteBuffer.NumActiveChannels(); ++ch)
