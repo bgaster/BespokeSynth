@@ -60,8 +60,8 @@ namespace AAModuleLookup {
 }
 
 AATest::AATest()
-: 
-  mLabel{"empty"}
+: IAudioProcessor(gBufferSize)
+, mLabel{"empty"}
 , mWidth{0.f}
 , mHeight{0.f}
 , mNoteInputBuffer(this)
@@ -293,6 +293,8 @@ void AATest::Process(double time)
    if (!mEnabled || GetTarget() == nullptr || !aaModule)
       return;
    
+   GetBuffer()->SetNumActiveChannels(mNumInputs);
+
    mNoteInputBuffer.Process(time);
    
    ComputeSliders(0);
@@ -304,12 +306,19 @@ void AATest::Process(double time)
    ChannelBuffer* out = &mWriteBuffer;
 
    // Now handle computing audio in AA world
+   // current limitation is support for only max 2 input and max 2 outputs
    if (mNumInputs > 0) {
       if (mNumInputs == 2) {
 
       }
       else {
-
+         if (mNumOutputs == 2) {
+            aa_module_compute_one_two_non(
+               aaModule, 
+               bufferSize, 
+               GetBuffer()->GetChannel(0), 
+               out->GetChannel(0), out->GetChannel(1));
+         }
       }
    }
    else if (mNumOutputs == 2) {
@@ -318,6 +327,8 @@ void AATest::Process(double time)
    else {
       aa_module_compute_zero_one(aaModule, bufferSize, out->GetChannel(0));
    }
+
+   GetBuffer()->Clear();
    
    SyncOutputBuffer(mWriteBuffer.NumActiveChannels());
    for (int ch=0; ch<mWriteBuffer.NumActiveChannels(); ++ch)

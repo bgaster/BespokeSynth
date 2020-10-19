@@ -14,7 +14,8 @@
 #include <vector>
 #include <tuple>
 
-#include "IAudioSource.h"
+#include "IAudioProcessor.h"
+//#include "IAudioSource.h"
 #include "PolyphonyMgr.h"
 #include "SingleOscillatorVoice.h"
 #include "ADSR.h"
@@ -338,7 +339,7 @@ private:
 
 class AATest;
 
-class AATest : public IAudioSource, public INoteReceiver, public IDrawableModule, 
+class AATest : public IAudioProcessor, public INoteReceiver, public IDrawableModule, 
                public IDropdownListener, public IFloatSliderListener, public IIntSliderListener, 
                public IRadioButtonListener
 {
