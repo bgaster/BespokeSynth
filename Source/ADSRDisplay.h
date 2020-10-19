@@ -9,10 +9,19 @@
 #ifndef __modularSynth__ADSRDisplay__
 #define __modularSynth__ADSRDisplay__
 
+#include <functional>
 #include <iostream>
 #include "IUIControl.h"
 #include "ADSR.h"
 #include "Slider.h"
+
+enum UpdateADSRParam
+{
+   kUpdateAttack,
+   kUpdateDecaySustain,
+   kUpdateRelease,
+   kUpdateNone
+};
 
 class IDrawableModule;
 class EnvelopeEditor;
@@ -20,7 +29,7 @@ class EnvelopeEditor;
 class ADSRDisplay : public IUIControl
 {
 public:
-   ADSRDisplay(IDrawableModule* owner, const char* name, int x, int y, int w, int h, ::ADSR* adsr);
+    ADSRDisplay(IDrawableModule* owner, const char* name, int x, int y, int w, int h, ::ADSR* adsr, std::function<void(UpdateADSRParam)> updateADSRFunc = [](UpdateADSRParam p) {});
    void Render() override;
    void MouseReleased() override;
    bool MouseMoved(float x, float y) override;
@@ -39,6 +48,26 @@ public:
    bool CanBeTargetedBy(PatchCableSource* source) const override { return false; }
    void SaveState(FileStreamOut& out) override;
    void LoadState(FileStreamIn& in, bool shouldSetValue = true) override;
+    
+   bool isASlider(FloatSlider* slider)
+   {
+     return mASlider == slider;
+   }
+        
+   bool isDSlider(FloatSlider* slider)
+   {
+      return mDSlider == slider;
+   }
+        
+   bool isSSlider(FloatSlider* slider)
+   {
+      return mSSlider == slider;
+   }
+   
+   bool isRSlider(FloatSlider* slider)
+   {
+      return mDSlider == slider;
+   }
    
    enum DisplayMode
    {

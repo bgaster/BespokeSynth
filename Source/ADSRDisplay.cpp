@@ -14,7 +14,7 @@
 
 ADSRDisplay::DisplayMode ADSRDisplay::sDisplayMode = ADSRDisplay::kDisplayEnvelope;
 
-ADSRDisplay::ADSRDisplay(IDrawableModule* owner, const char* name, int x, int y, int w, int h, ::ADSR* adsr)
+ADSRDisplay::ADSRDisplay(IDrawableModule* owner, const char* name, int x, int y, int w, int h, ::ADSR* adsr, std::function<void(UpdateADSRParam)> updateADSRFunc)
 : mClick(false)
 , mWidth(w)
 , mHeight(h)

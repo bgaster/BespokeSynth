@@ -207,6 +207,8 @@
         <FILE id="RG4zGd" name="TremoloEffect.h" compile="0" resource="0" file="Source/TremoloEffect.h"/>
       </GROUP>
       <GROUP id="{6781AC07-A090-A7AF-8D27-BCB6D9526ABD}" name="modules">
+        <FILE id="GUUfbm" name="AAModule.cpp" compile="1" resource="0" file="Source/AAModule.cpp"/>
+        <FILE id="fMuyJY" name="AAModule.h" compile="0" resource="0" file="Source/AAModule.h"/>
         <FILE id="lUxXQ6" name="GlobalControls.cpp" compile="1" resource="0"
               file="Source/GlobalControls.cpp"/>
         <FILE id="JH3qj5" name="GlobalControls.h" compile="0" resource="0"
@@ -363,13 +365,13 @@
               file="Source/ControlTactileFeedback.h"/>
         <FILE id="r7DGR1" name="CurveLooper.cpp" compile="1" resource="0" file="Source/CurveLooper.cpp"/>
         <FILE id="UltEBY" name="CurveLooper.h" compile="0" resource="0" file="Source/CurveLooper.h"/>
-        <FILE id="jYYH0P" name="DebugAudioSource.cpp" compile="1" resource="0"
-              file="Source/DebugAudioSource.cpp"/>
         <FILE id="DZjoXj" name="DebugAudioSource.h" compile="0" resource="0"
               file="Source/DebugAudioSource.h"/>
         <FILE id="o3f3Es" name="DrumPlayer.cpp" compile="1" resource="0" file="Source/DrumPlayer.cpp"/>
         <FILE id="H2IdjT" name="DrumPlayer.h" compile="0" resource="0" file="Source/DrumPlayer.h"/>
         <FILE id="b3GkhQ" name="DrumSynth.cpp" compile="1" resource="0" file="Source/DrumSynth.cpp"/>
+        <FILE id="jYYH0P" name="DebugAudioSource.cpp" compile="1" resource="0"
+              file="Source/DebugAudioSource.cpp"/>
         <FILE id="BpdZ8w" name="DrumSynth.h" compile="0" resource="0" file="Source/DrumSynth.h"/>
         <FILE id="KhkfQS" name="EffectChain.cpp" compile="1" resource="0" file="Source/EffectChain.cpp"/>
         <FILE id="hnLO0H" name="EffectChain.h" compile="0" resource="0" file="Source/EffectChain.h"/>
@@ -682,11 +684,11 @@
               file="Source/SingleOscillator.cpp"/>
         <FILE id="C8L3ne" name="SingleOscillator.h" compile="0" resource="0"
               file="Source/SingleOscillator.h"/>
-        <FILE id="w7uJ85" name="SliderSequencer.cpp" compile="1" resource="0"
-              file="Source/SliderSequencer.cpp"/>
         <FILE id="kRGpA9" name="SliderSequencer.h" compile="0" resource="0"
               file="Source/SliderSequencer.h"/>
         <FILE id="SgSrx0" name="SlowLayers.cpp" compile="1" resource="0" file="Source/SlowLayers.cpp"/>
+        <FILE id="w7uJ85" name="SliderSequencer.cpp" compile="1" resource="0"
+              file="Source/SliderSequencer.cpp"/>
         <FILE id="rCkxj9" name="SlowLayers.h" compile="0" resource="0" file="Source/SlowLayers.h"/>
         <FILE id="S1vrVW" name="Splitter.cpp" compile="1" resource="0" file="Source/Splitter.cpp"/>
         <FILE id="tlHVYw" name="Splitter.h" compile="0" resource="0" file="Source/Splitter.h"/>
@@ -788,11 +790,11 @@
       <FILE id="IgwkEU" name="ChannelBuffer.h" compile="0" resource="0" file="Source/ChannelBuffer.h"/>
       <FILE id="ev4J6H" name="Bespoke_Platform.cpp" compile="1" resource="0"
             file="Source/Bespoke_Platform.cpp"/>
-      <FILE id="VZwfve" name="BiquadFilter.cpp" compile="1" resource="0"
-            file="Source/BiquadFilter.cpp"/>
       <FILE id="GEN8T2" name="BiquadFilter.h" compile="0" resource="0" file="Source/BiquadFilter.h"/>
       <FILE id="U8kNve" name="Canvas.cpp" compile="1" resource="0" file="Source/Canvas.cpp"/>
       <FILE id="r7vQTO" name="Canvas.h" compile="0" resource="0" file="Source/Canvas.h"/>
+      <FILE id="VZwfve" name="BiquadFilter.cpp" compile="1" resource="0"
+            file="Source/BiquadFilter.cpp"/>
       <FILE id="ElDDLn" name="CanvasControls.cpp" compile="1" resource="0"
             file="Source/CanvasControls.cpp"/>
       <FILE id="kV5W6C" name="CanvasControls.h" compile="0" resource="0"
