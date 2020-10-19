@@ -1002,7 +1002,7 @@
           file="bespoke_icon.png"/>
   </MAINGROUP>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="Builds/MacOSX" vstFolder="~/SDKs/vstsdk2.4" extraDefs="BESPOKE_MAC"
+    <XCODE_MAC targetFolder="Builds/MacOSX" vstFolder="~/SDKs/vstsdk2.4" extraDefs="BESPOKE_MAC&#10;BESPOKE_AUDIOANYWHERE"
                microphonePermissionNeeded="1" vstLegacyFolder="~/SDKs/VST_SDK/VST2_SDK"
                extraLinkerFlags="-L../../../aa_wasmtime_c/target/release -L/System/Library/Frameworks/Python.framework/Versions/2.7/lib/python2.7/config -lpython2.7 -ldl -laa_wasmtime_c -framework CoreFoundation -framework CoreAudioKit"
                extraCompilerFlags="-iwithsysroot /System/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7"

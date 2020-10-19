@@ -203,6 +203,10 @@
 #include "FubbleModule.h"
 #include "GlobalControls.h"
 
+#ifdef BESPOKE_AUDIOANYWHERE
+#include "AAModule.h"
+#endif
+
 #define REGISTER(class,name,type) Register(#name, &(class::Create), &(class::CanCreate), type, false, false);
 #define REGISTER_HIDDEN(class,name,type) Register(#name, &(class::Create), &(class::CanCreate), type, true, false);
 #define REGISTER_EXPERIMENTAL(class,name,type) Register(#name, &(class::Create), &(class::CanCreate), type, false, true);
@@ -380,6 +384,9 @@ ModuleFactory::ModuleFactory()
    REGISTER_EXPERIMENTAL(ComboGridController, combogrid, kModuleType_Other);
    REGISTER_EXPERIMENTAL(PitchChorus, pitchchorus, kModuleType_Audio);
 
+#ifdef BESPOKE_AUDIOANYWHERE
+REGISTER_HIDDEN(AATest, aamodule, kModuleType_Synth);
+#endif
    REGISTER_HIDDEN(VSTPlugin, vstplugin, kModuleType_Synth);
    REGISTER_HIDDEN(SampleFinder, samplefinder, kModuleType_Audio);
    REGISTER_HIDDEN(Producer, producer, kModuleType_Audio);

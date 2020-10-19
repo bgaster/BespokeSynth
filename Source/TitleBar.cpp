@@ -16,11 +16,18 @@
 #include "VSTPlugin.h"
 #include "Prefab.h"
 
+#ifdef BESPOKE_AUDIOANYWHERE
+#include "AAModule.h"
+#endif
+
 TitleBar* TheTitleBar = nullptr;
 
 namespace
 {
    const string kRescanPluginsLabel = "rescan VSTs...";
+#ifdef BESPOKE_AUDIOANYWHERE
+   const string kRescanAAModulesLabel = "rescan AAs...";
+#endif
 }
 
 SpawnList::SpawnList(IDropdownListener* owner, SpawnListManager* listManager, int x, int y, string label)
@@ -84,6 +91,17 @@ IDrawableModule* SpawnList::Spawn()
          return nullptr;
       }
    }
+
+#ifdef BESPOKE_AUDIOANYWHERE
+   if (mOverrideModuleType == "aamodule")
+   {
+      if (mSpawnables[mSpawnIndex] == kRescanAAModulesLabel)
+      {
+         mListManager->SetUpAAModuleDropdown(true);
+         return nullptr;
+      }
+   }
+#endif
    
    IDrawableModule* module = TheSynth->SpawnModuleOnTheFly(moduleType, TheSynth->GetMouseX() + moduleGrabOffset.x, TheSynth->GetMouseY() + moduleGrabOffset.y);
    
@@ -93,6 +111,14 @@ IDrawableModule* SpawnList::Spawn()
       plugin->SetVST(mSpawnables[mSpawnIndex]);
    }
    
+#ifdef BESPOKE_AUDIOANYWHERE
+   if (mOverrideModuleType == "aamodule")
+   {
+      AATest* aaModule = dynamic_cast<AATest*>(module);
+      aaModule->SetModule(mSpawnables[mSpawnIndex]);
+   }
+#endif
+
    if (mOverrideModuleType == "prefab")
    {
       Prefab* prefab = dynamic_cast<Prefab*>(module);
@@ -176,6 +202,9 @@ SpawnListManager::SpawnListManager(IDropdownListener* owner)
 , mOtherModules(owner,this,0,0,"other:")
 , mVstPlugins(owner,this,0,0,"vst plugins:")
 , mPrefabs(owner,this,0,0,"prefabs:")
+#ifdef BESPOKE_AUDIOANYWHERE
+, mAAModules(owner, this, 0, 0, "aamodules")
+#endif
 {
 }
 
@@ -189,7 +218,10 @@ void SpawnListManager::SetModuleFactory(ModuleFactory* factory)
    mOtherModules.SetList(factory->GetSpawnableModules(kModuleType_Other), "");
    
    SetUpVstDropdown(false);
-   
+#ifdef BESPOKE_AUDIOANYWHERE
+   SetUpAAModuleDropdown(false);
+#endif
+
    File dir(ofToDataPath("prefabs"));
    Array<File> files;
    dir.findChildFiles(files, File::findFiles, false);
@@ -209,6 +241,9 @@ void SpawnListManager::SetModuleFactory(ModuleFactory* factory)
    mDropdowns.push_back(&mOtherModules);
    mDropdowns.push_back(&mVstPlugins);
    mDropdowns.push_back(&mPrefabs);
+#ifdef BESPOKE_AUDIOANYWHERE
+   mDropdowns.push_back(&mAAModules);
+#endif
 }
 
 void SpawnListManager::SetUpVstDropdown(bool rescan)
@@ -218,6 +253,16 @@ void SpawnListManager::SetUpVstDropdown(bool rescan)
    vsts.push_back(kRescanPluginsLabel);
    mVstPlugins.SetList(vsts, "vstplugin");
 }
+
+#ifdef BESPOKE_AUDIOANYWHERE
+void SpawnListManager::SetUpAAModuleDropdown(bool rescan)
+{
+   vector<string> modules;
+   AAModuleLookup::GetAvailableAAModules(modules, rescan);
+   modules.push_back(kRescanAAModulesLabel);
+   mAAModules.SetList(modules, "aamodule");
+}   
+#endif
 
 void TitleBar::ListLayouts()
 {
@@ -289,6 +334,17 @@ void TitleBar::DrawModule()
 
    float x = startX;
    float y = startY;
+#ifdef BESPOKE_AUDIOANYWHERE
+    array<SpawnList*, 9> lists = { &mSpawnLists.mInstrumentModules,
+                                   &mSpawnLists.mNoteModules,
+                                   &mSpawnLists.mSynthModules,
+                                   &mSpawnLists.mAudioModules,
+                                   &mSpawnLists.mModulatorModules,
+                                   &mSpawnLists.mOtherModules,
+                                   &mSpawnLists.mVstPlugins,
+                                   &mSpawnLists.mAAModules,
+                                   &mSpawnLists.mPrefabs };
+#else
    array<SpawnList*, 8> lists = { &mSpawnLists.mInstrumentModules,
                                   &mSpawnLists.mNoteModules,
                                   &mSpawnLists.mSynthModules,
@@ -297,7 +353,8 @@ void TitleBar::DrawModule()
                                   &mSpawnLists.mOtherModules,
                                   &mSpawnLists.mVstPlugins,
                                   &mSpawnLists.mPrefabs };
-
+#endif
+    
    for (auto list : lists)
    {
       list->SetPosition(x, y);
@@ -330,6 +387,10 @@ void TitleBar::DrawModule()
    mSpawnLists.mVstPlugins.Draw();
    mModuleType = kModuleType_Other;
    mSpawnLists.mPrefabs.Draw();
+#ifdef BESPOKE_AUDIOANYWHERE
+   mModuleType = kModuleType_Synth;
+   mSpawnLists.mAAModules.Draw();                                 
+#endif
    mModuleType = type;
    
    float usage = TheSynth->GetGlobalManagers()->mDeviceManager.getCpuUsage();
@@ -388,6 +449,9 @@ void TitleBar::DropdownUpdated(DropdownList* list, int oldVal)
    mSpawnLists.mOtherModules.OnSelection(list);
    mSpawnLists.mVstPlugins.OnSelection(list);
    mSpawnLists.mPrefabs.OnSelection(list);
+#ifdef BESPOKE_AUDIOANYWHERE
+   mSpawnLists.mAAModules.OnSelection(list);                               
+#endif
 }
 
 void TitleBar::ButtonClicked(ClickButton* button)

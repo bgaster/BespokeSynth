@@ -49,6 +49,10 @@ struct SpawnListManager
    
    void SetModuleFactory(ModuleFactory* factory);
    void SetUpVstDropdown(bool rescan);
+#ifdef BESPOKE_AUDIOANYWHERE
+   void SetUpAAModuleDropdown(bool rescan);
+#endif
+   
    vector<SpawnList*> GetDropdowns() { return mDropdowns; }
    
    SpawnList mInstrumentModules;
@@ -59,6 +63,10 @@ struct SpawnListManager
    SpawnList mOtherModules;
    SpawnList mVstPlugins;
    SpawnList mPrefabs;
+   
+#ifdef BESPOKE_AUDIOANYWHERE
+   SpawnList mAAModules;
+#endif
    
 private:
    vector<SpawnList*> mDropdowns;
