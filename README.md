@@ -1,3 +1,12 @@
+# Audio Anywhere
+
+This is a modifided version of Bespoke Synth to support Audio Anywhere modules. 
+
+Audio Anywhere is a framework for working with audio plugins that are compiled once and run anywhere. At the heart of Audio Anywhere is an audio engine whose Digital Signal Processing (DSP) components are written in Faust and deployed with WebAssembly. 
+
+Details about the project can be found on the [project's homepage](https://muses-dmi.github.io/projects/).
+
+
 # Bespoke Synth
 A software modular synth that I'm building for myself, and you can use it if you want to. If you're interested, you can find some out of date documentation at https://www.reddit.com/r/BespokeSynth, or you can just jump in and start messing around.
 
