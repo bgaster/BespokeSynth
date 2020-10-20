@@ -32,7 +32,7 @@ namespace AAModuleLookup {
    void GetAvailableAAModules(vector<string>& modules, bool rescan) {
       if (rescan) {
          sAAModuleList.clear();
-         
+
          auto modulesJSON = aa_get_modules("http://127.0.0.1:8000");
 
          auto mJSON = ofxJSONElement{std::string{modulesJSON}};
@@ -74,105 +74,113 @@ AATest::AATest()
 }
 
 void AATest::CreateModuleControls() {
-   if (mJSONUi["widgets"].isArray()) {
-      auto widgets = mJSONUi["widgets"];
+   if (mJSONUi["widgets"].isObject()) {
+      // sliders
+      if (mJSONUi["widgets"]["sliders"].isArray()) {
+         auto sliders = mJSONUi["widgets"]["sliders"];
 
-      for (auto b = widgets.begin(); b != widgets.end(); b++) {
-         assert((*b)["type"].isString());
-         auto widgetType = (*b)["type"].asString();
+         for (auto b = sliders.begin(); b != sliders.end(); b++) {
+            assert((*b)["type"].isString());
+            auto sliderType = (*b)["type"].asString();
          
-         if (widgetType.compare("float_slider") == 0) {
-            assert((*b)["name"].isString());
-            auto name = (*b)["name"].asString();
+            if (sliderType.compare("float_slider") == 0) {
+               assert((*b)["name"].isString());
+               auto name = (*b)["name"].asString();
 
-            assert((*b)["w"].isInt() && (*b)["h"].isInt());
-            int w = (*b)["w"].asInt();
-            int h = (*b)["h"].asInt();
+               assert((*b)["w"].isInt() && (*b)["h"].isInt());
+               int w = (*b)["w"].asInt();
+               int h = (*b)["h"].asInt();
 
-            assert((*b)["init"].isDouble() && (*b)["min"].isDouble() && (*b)["max"].isDouble());
-            float init = static_cast<float>((*b)["init"].asDouble());
-            float min = static_cast<float>((*b)["min"].asDouble());
-            float max = static_cast<float>((*b)["max"].asDouble());
+               assert((*b)["init"].isDouble() && (*b)["min"].isDouble() && (*b)["max"].isDouble());
+               float init = static_cast<float>((*b)["init"].asDouble());
+               float min = static_cast<float>((*b)["min"].asDouble());
+               float max = static_cast<float>((*b)["max"].asDouble());
 
-            assert((*b)["node"].isInt() && (*b)["index"].isInt());
-            int node = (*b)["node"].asInt();
-            int index = (*b)["index"].asInt();
+               assert((*b)["node"].isInt() && (*b)["index"].isInt());
+               int node = (*b)["node"].asInt();
+               int index = (*b)["index"].asInt();
 
-            int digits = -1;
-            if ((*b)["digits"].isInt()) {
-               digits = (*b)["digits"].asInt();
-            }
-            
-            // is it anchored slider?
-            if ((*b)["anchored"].isString()) {
-               auto anchor = toAnchorDirection((*b)["anchored"].asString());
-               if (mFSliders.size() > 0) {
-                  auto slider = new AASlider(
-                     node, index, this, name, mFSliders[mFSliders.size()-1]->getSlider(), 
-                     anchor, w, h, init, min, max, digits);
+               int digits = -1;
+               if ((*b)["digits"].isInt()) {
+                  digits = (*b)["digits"].asInt();
+               }
+               
+               // is it anchored slider?
+               if ((*b)["anchored"].isString()) {
+                  auto anchor = toAnchorDirection((*b)["anchored"].asString());
+                  if (mFSliders.size() > 0) {
+                     auto slider = new AASlider(
+                        node, index, this, name, mFSliders[mFSliders.size()-1]->getSlider(), 
+                        anchor, w, h, init, min, max, digits);
+                     mFSliders.push_back(slider);
+                  }
+               }
+               else {
+                  assert((*b)["x"].isInt() && (*b)["y"].isInt());
+                  int x = (*b)["x"].asInt();
+                  int y = (*b)["y"].asInt();
+                  auto slider = new AASlider(node, index, this, name, x, y, w, h, init, min, max, digits);
                   mFSliders.push_back(slider);
                }
             }
-            else {
-               assert((*b)["x"].isInt() && (*b)["y"].isInt());
-               int x = (*b)["x"].asInt();
-               int y = (*b)["y"].asInt();
-               auto slider = new AASlider(node, index, this, name, x, y, w, h, init, min, max, digits);
-               mFSliders.push_back(slider);
-            }
-         }
-         else if (widgetType.compare("int_slider") == 0) {
-            assert((*b)["name"].isString());
-            auto name = (*b)["name"].asString();
+            else if (sliderType.compare("int_slider") == 0) {
+               assert((*b)["name"].isString());
+               auto name = (*b)["name"].asString();
 
-            assert((*b)["w"].isInt() && (*b)["h"].isInt());
-            int w = (*b)["w"].asInt();
-            int h = (*b)["h"].asInt();
+               assert((*b)["w"].isInt() && (*b)["h"].isInt());
+               int w = (*b)["w"].asInt();
+               int h = (*b)["h"].asInt();
 
-            assert((*b)["init"].isInt() && (*b)["min"].isInt() && (*b)["max"].isInt());
-            float init = (*b)["init"].asInt();
-            float min = (*b)["min"].asInt();
-            float max = (*b)["max"].asInt();
+               assert((*b)["init"].isInt() && (*b)["min"].isInt() && (*b)["max"].isInt());
+               float init = (*b)["init"].asInt();
+               float min = (*b)["min"].asInt();
+               float max = (*b)["max"].asInt();
 
-            assert((*b)["node"].isInt() && (*b)["index"].isInt());
-            int node = (*b)["node"].asInt();
-            int index = (*b)["index"].asInt();
+               assert((*b)["node"].isInt() && (*b)["index"].isInt());
+               int node = (*b)["node"].asInt();
+               int index = (*b)["index"].asInt();
 
-            auto map2Float = std::function<float (int)>(
-               [](int v) -> float { return static_cast<float>(v); });
+               auto map2Float = std::function<float (int)>(
+                  [](int v) -> float { return static_cast<float>(v); });
 
-            if ((*b)["map_to_float"].isObject()) {
-               auto m = (*b)["map_to_float"];
-               if (m != Json::nullValue) {
-                  assert(m["min"].isDouble() && m["max"].isDouble());
-                  float minF = static_cast<float>(m["min"].asDouble());
-                  float maxF = static_cast<float>(m["max"].asDouble());
+               if ((*b)["map_to_float"].isObject()) {
+                  auto m = (*b)["map_to_float"];
+                  if (m != Json::nullValue) {
+                     assert(m["min"].isDouble() && m["max"].isDouble());
+                     float minF = static_cast<float>(m["min"].asDouble());
+                     float maxF = static_cast<float>(m["max"].asDouble());
 
-                  map2Float = [=](int v) -> float {
-                     return map_to(static_cast<float>(v), static_cast<float>(min), static_cast<float>(max), minF, maxF);
-                  };
+                     map2Float = [=](int v) -> float {
+                        return map_to(static_cast<float>(v), static_cast<float>(min), static_cast<float>(max), minF, maxF);
+                     };
+                  }
                }
-            }
-            
-            // is it anchored slider?
-            if ((*b)["anchored"].isString()) {
-               auto anchor = toAnchorDirection((*b)["anchored"].asString());
-               if (mISliders.size() > 0) {
-                  auto slider = new AAISlider(
-                     node, index, this, name, mISliders[mISliders.size()-1]->getSlider(), 
-                     anchor, w, h, init, min, max, map2Float);
+               
+               // is it anchored slider?
+               if ((*b)["anchored"].isString()) {
+                  auto anchor = toAnchorDirection((*b)["anchored"].asString());
+                  if (mISliders.size() > 0) {
+                     auto slider = new AAISlider(
+                        node, index, this, name, mISliders[mISliders.size()-1]->getSlider(), 
+                        anchor, w, h, init, min, max, map2Float);
+                     mISliders.push_back(slider);
+                  }
+               }
+               else {
+                  assert((*b)["x"].isInt() && (*b)["y"].isInt());
+                  int x = (*b)["x"].asInt();
+                  int y = (*b)["y"].asInt();
+                  auto slider = new AAISlider(node, index, this, name, x, y, w, h, init, min, max, map2Float);
                   mISliders.push_back(slider);
                }
             }
-            else {
-               assert((*b)["x"].isInt() && (*b)["y"].isInt());
-               int x = (*b)["x"].asInt();
-               int y = (*b)["y"].asInt();
-               auto slider = new AAISlider(node, index, this, name, x, y, w, h, init, min, max, map2Float);
-               mISliders.push_back(slider);
-            }
          }
-         else if (widgetType.compare("adsr") == 0) {
+      }
+      
+      if (mJSONUi["widgets"]["adsrs"].isArray() && mJSONUi["widgets"]["adsrs"] != Json::nullValue) {
+         auto adsrs = mJSONUi["widgets"]["adsrs"];
+
+         for (auto b = adsrs.begin(); b != adsrs.end(); b++) {
             assert((*b)["name"].isString());
             auto name = (*b)["name"].asString();
 
@@ -184,25 +192,29 @@ void AATest::CreateModuleControls() {
             int w = (*b)["w"].asInt();
             int h = (*b)["h"].asInt();
 
-            assert((*b)["indexA"].isInt() && (*b)["initA"].isDouble() && (*b)["minA"].isDouble() && (*b)["maxA"].isDouble());
+            assert((*b)["indexA"].isInt() && (*b)["initA"].isDouble() && 
+                   (*b)["minA"].isDouble() && (*b)["maxA"].isDouble());
             int indexA = (*b)["indexA"].asInt();
             float initA = static_cast<float>((*b)["initA"].asDouble());
             float minA = static_cast<float>((*b)["minA"].asDouble());
             float maxA = static_cast<float>((*b)["maxA"].asDouble());
 
-            assert((*b)["indexD"].isInt() && (*b)["initD"].isDouble() && (*b)["minD"].isDouble() && (*b)["maxD"].isDouble());
+            assert((*b)["indexD"].isInt() && (*b)["initD"].isDouble() && 
+                   (*b)["minD"].isDouble() && (*b)["maxD"].isDouble());
             int indexD = (*b)["indexD"].asInt();
             float initD = static_cast<float>((*b)["initD"].asDouble());
             float minD = static_cast<float>((*b)["minD"].asDouble());
             float maxD = static_cast<float>((*b)["maxD"].asDouble());
 
-            assert((*b)["indexS"].isInt() && (*b)["initS"].isDouble() && (*b)["minS"].isDouble() && (*b)["maxS"].isDouble());
+            assert((*b)["indexS"].isInt() && (*b)["initS"].isDouble() && 
+                   (*b)["minS"].isDouble() && (*b)["maxS"].isDouble());
             int indexS = (*b)["indexS"].asInt();
             float initS = static_cast<float>((*b)["initS"].asDouble());
             float minS = static_cast<float>((*b)["minS"].asDouble());
             float maxS = static_cast<float>((*b)["maxS"].asDouble());
 
-            assert((*b)["indexR"].isInt() && (*b)["initR"].isDouble() && (*b)["minR"].isDouble() && (*b)["maxR"].isDouble());
+            assert((*b)["indexR"].isInt() && (*b)["initR"].isDouble() && 
+                   (*b)["minR"].isDouble() && (*b)["maxR"].isDouble());
             int indexR = (*b)["indexR"].asInt();
             float initR = static_cast<float>((*b)["initR"].asDouble());
             float minR = static_cast<float>((*b)["minR"].asDouble());
@@ -221,11 +233,16 @@ void AATest::CreateModuleControls() {
 
             mAAADSRs.push_back(mAAADSR);
          }
-         else if (widgetType.compare("dropdown") == 0) {
+      }
+      
+      if (mJSONUi["widgets"]["dropdown"].isArray()) {
+         auto dropdowns = mJSONUi["widgets"]["dropdowns"];
+
+         for (auto b = dropdowns.begin(); b != dropdowns.end(); b++) {
             assert((*b)["name"].isString());
             auto name = (*b)["name"].asString();
 
-            std::vector<std::pair<std::string, std::vector<std::tuple<int, int, float>>>> paramsR;
+            std::vector<std::pair<std::string, std::vector<std::tuple<int, int, float, std::function<void ()>>>>> paramsR;
 
             if ((*b)["params"].isArray()) {
                auto params = (*b)["params"];
@@ -234,7 +251,7 @@ void AATest::CreateModuleControls() {
                   assert((*p)["name"].isString());
                   auto name = (*p)["name"].asString();
 
-                  std::vector<std::tuple<int, int, float>> valuesR;
+                  std::vector<std::tuple<int, int, float, std::function<void ()>>> valuesR;
                   if ((*p)["values"].isArray()) {
                      auto values = (*p)["values"];
                      for (auto v = values.begin(); v != values.end(); v++) {
@@ -242,11 +259,42 @@ void AATest::CreateModuleControls() {
                         int node = (*v)["node"].asInt();
                         int index = (*v)["index"].asInt();
                         float value = static_cast<float>((*v)["value"].asDouble());
-                        valuesR.push_back(std::make_tuple(node, index, value));
+
+                        std::function<void ()> f = [] {}; 
+
+                        // finally handle any other UI updates implied by this command
+                        if ((*v)["slider"].isObject() && (*v)["slider"] != Json::nullValue) {
+                           auto slider = (*v)["slider"];
+                           
+                           assert(slider["name"].isString());
+                           auto name = slider["name"].asString();
+
+                           if (slider["value"].isInt() && slider["value"] != Json::nullValue) {
+                              auto value = slider["value"].asInt();
+
+                              for (auto s: mISliders) {
+                                 if (s->getName().compare(name) == 0) {
+                                    f = [=] { s->setValue(value); };
+                                 }
+                              }
+                           }
+                           else if (slider["value"].isDouble() && slider["value"] != Json::nullValue) {
+                              auto value = slider["value"].asDouble();
+
+                              std::function<void ()> f = [] {}; 
+                              for (auto s: mFSliders) {
+                                 if (s->getName().compare(name) == 0) {
+                                    f = [=] { s->setValue(static_cast<float>(value)); };
+                                 }
+                              }
+                           }
+                        }
+
+                        valuesR.push_back(std::make_tuple(node, index, value, f));
                      }
                   }
 
-                  paramsR.push_back(std::pair<std::string, std::vector<std::tuple<int, int, float>>>{name, valuesR});
+                  paramsR.push_back(std::pair<std::string, std::vector<std::tuple<int, int, float, std::function<void ()>>>>{name, valuesR});
                }
             }
 

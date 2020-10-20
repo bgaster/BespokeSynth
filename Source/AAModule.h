@@ -158,7 +158,7 @@ class AADropdownList
 {
 public:
     AADropdownList(
-        std::vector<std::pair<std::string, std::vector<std::tuple<int, int, float>>>> params, 
+        std::vector<std::pair<std::string, std::vector<std::tuple<int, int, float, std::function<void ()>>>>> params, 
         IDropdownListener* owner, const char* name, int x, int y, float width = -1) :
           mDropdownList{nullptr}
         , mVar{0}
@@ -170,7 +170,7 @@ public:
         }
     }
     AADropdownList(
-        std::vector<std::pair<std::string, std::vector<std::tuple<int, int, float>>>> params, 
+        std::vector<std::pair<std::string, std::vector<std::tuple<int, int, float, std::function<void ()>>>>> params, 
         IDropdownListener* owner, const char* name, IUIControl* anchor, 
         AnchorDirection anchorDirection, float width = -1) :
           mDropdownList{nullptr}
@@ -193,6 +193,7 @@ public:
         if (mDropdownList == list) {
             for (auto& p: mParams[mVar]) {
                 set_param_float(module, std::get<0>(p), std::get<1>(p), std::get<2>(p));
+                std::get<3>(p)();
             }
         }
     }
@@ -203,7 +204,7 @@ public:
     }
 private:
     DropdownList* mDropdownList;
-    std::vector<std::vector<std::tuple<int, int, float>>> mParams; 
+    std::vector<std::vector<std::tuple<int, int, float, std::function<void ()>>>> mParams; 
     int mVar;
 };
 
@@ -215,7 +216,8 @@ public:
           mSlider{nullptr}
         , mValue{init}
         , mNode{node}
-        , mIndex{index} 
+        , mIndex{index}
+        , mName{name}
     {
         mSlider = new FloatSlider(
             owner, 
@@ -234,7 +236,8 @@ public:
           mSlider{nullptr}
         , mValue{init}
         , mNode{node}
-        , mIndex{index} 
+        , mIndex{index}
+        , mName{name}
     {
         mSlider = new FloatSlider(
                 owner, 
@@ -262,11 +265,20 @@ public:
     FloatSlider* getSlider() const {
         return mSlider;
     }
+
+    std::string getName() const {
+        return mName;
+    }
+
+    void setValue(float v) {
+        mValue = v;
+    }
 private:
     FloatSlider* mSlider;
     float mValue;
     int mNode;
     int mIndex;
+    std::string mName;
 };
 
 class AAISlider 
@@ -281,6 +293,7 @@ public:
         , mNode{node}
         , mIndex{index}
         , mMap2Float{map2Float}
+        , mName{name}
     {
         mSlider = new IntSlider(
             owner, 
@@ -302,6 +315,7 @@ public:
         , mNode{node}
         , mIndex{index}
         , mMap2Float{map2Float}
+        , mName{name}
     {
         mSlider = new IntSlider(
                 owner, 
@@ -328,12 +342,21 @@ public:
     IntSlider* getSlider() const {
         return mSlider;
     }
+
+    std::string getName() const {
+        return mName;
+    }
+
+    void setValue(int v) {
+        mValue = v;
+    }
 private:
     IntSlider* mSlider;
     int mValue;
     int mNode;
     int mIndex;
     std::function<float (int)> mMap2Float;
+    std::string mName;
 };
 
 class AATest;
