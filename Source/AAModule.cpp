@@ -31,6 +31,8 @@ namespace AAModuleLookup {
 
    void GetAvailableAAModules(vector<string>& modules, bool rescan) {
       if (rescan) {
+         sAAModuleList.clear();
+         
          auto modulesJSON = aa_get_modules("http://127.0.0.1:8000");
 
          auto mJSON = ofxJSONElement{std::string{modulesJSON}};
@@ -305,29 +307,9 @@ void AATest::Process(double time)
    mWriteBuffer.Clear();
    ChannelBuffer* out = &mWriteBuffer;
 
-   // Now handle computing audio in AA world
-   // current limitation is support for only max 2 input and max 2 outputs
-   if (mNumInputs > 0) {
-      if (mNumInputs == 2) {
-
-      }
-      else {
-         if (mNumOutputs == 2) {
-            aa_module_compute_one_two_non(
-               aaModule, 
-               bufferSize, 
-               GetBuffer()->GetChannel(0), 
-               out->GetChannel(0), out->GetChannel(1));
-         }
-      }
-   }
-   else if (mNumOutputs == 2) {
-      aa_module_compute_zero_two_non(aaModule, bufferSize, out->GetChannel(0), out->GetChannel(1));
-   } 
-   else {
-      aa_module_compute_zero_one(aaModule, bufferSize, out->GetChannel(0));
-   }
-
+   // process audio in AA world
+   mModuleCompute(bufferSize, out);
+   
    GetBuffer()->Clear();
    
    SyncOutputBuffer(mWriteBuffer.NumActiveChannels());
@@ -509,6 +491,54 @@ void AATest::SetModule(string moduleName) {
          mWriteBuffer.SetNumActiveChannels(mNumOutputs);
          ofLog() << "aa inputs: " << mNumInputs << "  aa outputs: " << mNumOutputs;
          
+         // install audio compute function 
+         if (mNumInputs > 0) {
+            if (mNumInputs == 2) {
+               if (mNumOutputs == 2) {
+                  // two in two out
+                  //TODO: implement two in two out compute
+               }
+               else {
+                  // two in one out
+                  //TODO: implement two in one out compute
+               }
+            }
+            else {
+               if (mNumOutputs == 2) {
+                  // one in two out
+                  mModuleCompute = [&] (int bufferSize, ChannelBuffer* out) {
+                     aa_module_compute_one_two_non(
+                        aaModule, 
+                        bufferSize, 
+                        GetBuffer()->GetChannel(0), 
+                        out->GetChannel(0), out->GetChannel(1));
+                  };
+               }
+               else {
+                  // one in one out
+                  mModuleCompute = [&] (int bufferSize, ChannelBuffer* out) {
+                     aa_module_compute_one_one(
+                        aaModule, 
+                        bufferSize, 
+                        GetBuffer()->GetChannel(0), 
+                        out->GetChannel(0));
+                  };
+               }
+            }
+         }
+         else if (mNumOutputs == 2) {
+            // zero in one two out
+            mModuleCompute = [&] (int bufferSize, ChannelBuffer* out) {
+               aa_module_compute_zero_two_non(aaModule, bufferSize, out->GetChannel(0), out->GetChannel(1));
+            };
+         } 
+         else {
+            // zero in one out
+            mModuleCompute = [&] (int bufferSize, ChannelBuffer* out) {
+               aa_module_compute_zero_one(aaModule, bufferSize, out->GetChannel(0));
+            };
+         }
+
          auto jsonUI = get_gui_description(aaModule);
 
          if (jsonUI == nullptr) {

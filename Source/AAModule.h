@@ -15,7 +15,6 @@
 #include <tuple>
 
 #include "IAudioProcessor.h"
-//#include "IAudioSource.h"
 #include "PolyphonyMgr.h"
 #include "SingleOscillatorVoice.h"
 #include "ADSR.h"
@@ -390,17 +389,24 @@ private:
 
    NoteInputBuffer mNoteInputBuffer;
    
+    // sequences of UI elements for AA module
     std::vector<AASlider*> mFSliders;
     std::vector<AAISlider*> mISliders;
     std::vector<AAADSR*> mAAADSRs;
     std::vector<AADropdownList*> mAADropdownLists;
 
+    // tempory buffer for audio output date from AA world
     ChannelBuffer mWriteBuffer;
+
+    // function to compute audio in AA world
+    std::function<void (int, ChannelBuffer*)> mModuleCompute;
+
     int mNumInputs;
     int mNumOutputs;
 
    string mDebugLines;
     
+    // instance of loaded AA module
     AAModule * aaModule;
 
     AnchorDirection toAnchorDirection(std::string s) const {
