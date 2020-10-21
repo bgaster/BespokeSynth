@@ -33,7 +33,14 @@ namespace AAModuleLookup {
       if (rescan) {
          sAAModuleList.clear();
 
-         auto modulesJSON = aa_get_modules("http://127.0.0.1:8000");
+         //TODO: push URL definition to config file
+         auto url = std::string("http://127.0.0.1:8000");
+         auto modulesJSON = aa_get_modules(url.c_str());
+
+         if (modulesJSON == nullptr) {
+            ofLog() << "Failed to connect to AA server: " << url;
+            return;
+         }
 
          auto mJSON = ofxJSONElement{std::string{modulesJSON}};
 
@@ -112,6 +119,7 @@ void AATest::CreateModuleControls() {
                      auto slider = new AASlider(
                         node, index, this, name, mFSliders[mFSliders.size()-1]->getSlider(), 
                         anchor, w, h, init, min, max, digits);
+                     slider->setParamFloat(aaModule);
                      mFSliders.push_back(slider);
                   }
                }
@@ -120,6 +128,7 @@ void AATest::CreateModuleControls() {
                   int x = (*b)["x"].asInt();
                   int y = (*b)["y"].asInt();
                   auto slider = new AASlider(node, index, this, name, x, y, w, h, init, min, max, digits);
+                  slider->setParamFloat(aaModule);
                   mFSliders.push_back(slider);
                }
             }
@@ -164,6 +173,8 @@ void AATest::CreateModuleControls() {
                         node, index, this, name, mISliders[mISliders.size()-1]->getSlider(), 
                         anchor, w, h, init, min, max, map2Float);
                      mISliders.push_back(slider);
+                     // finally init param in module
+                     slider->setParamInt(aaModule);
                   }
                }
                else {
@@ -172,6 +183,8 @@ void AATest::CreateModuleControls() {
                   int y = (*b)["y"].asInt();
                   auto slider = new AAISlider(node, index, this, name, x, y, w, h, init, min, max, map2Float);
                   mISliders.push_back(slider);
+                  // finally init param in module
+                  slider->setParamInt(aaModule);
                }
             }
          }
