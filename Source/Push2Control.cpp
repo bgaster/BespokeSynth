@@ -115,6 +115,9 @@ void Push2Control::CreateUIControls()
    mSpawnModuleControls.push_back(mSpawnLists.mModulatorModules.GetList());
    mSpawnModuleControls.push_back(mSpawnLists.mOtherModules.GetList());
    mSpawnModuleControls.push_back(mSpawnLists.mVstPlugins.GetList());
+   #ifdef BESPOKE_AUDIOANYWHERE
+   mSpawnModuleControls.push_back(mSpawnLists.mAAModules.GetList());
+#endif
    mSpawnModuleControls.push_back(mSpawnLists.mPrefabs.GetList());
 }
 
@@ -558,6 +561,10 @@ void Push2Control::DrawControls(vector<IUIControl*> controls, bool sliders, floa
             moduleType = kModuleType_Other;
          if (controls[i] == mSpawnLists.mVstPlugins.GetList())
             moduleType = kModuleType_Synth;
+#ifdef BESPOKE_AUDIOANYWHERE
+         if (controls[i] == mSpawnLists.mAAModules.GetList())
+            moduleType = kModuleType_Synth;
+#endif
          if (controls[i] == mSpawnLists.mPrefabs.GetList())
             moduleType = kModuleType_Other;
       }
