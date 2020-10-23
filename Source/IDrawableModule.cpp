@@ -301,7 +301,8 @@ void IDrawableModule::DrawFrame(float w, float h, bool drawModule, float& titleB
    {
       ofSetColor(color, gModuleDrawAlpha);
       ofPushMatrix();
-      ofClipWindow(0, 0, w, h);
+      if (ShouldClipContents())
+         ofClipWindow(0, 0, w, h);
       DrawModule();
       ofPopMatrix();
       DrawModuleUnclipped();
@@ -410,6 +411,8 @@ ofColor IDrawableModule::GetColor(ModuleType type)
       color.setHsb(170, 100, 255);
    if (type == kModuleType_Modulator)
       color.setHsb(200, 100, 255);
+   if (type == kModuleType_Pulse)
+      color.setHsb(43, sSaturation, sBrightness);
    return color;
 }
 

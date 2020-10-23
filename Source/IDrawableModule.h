@@ -33,6 +33,7 @@ enum ModuleType
    kModuleType_Instrument,
    kModuleType_Processor,
    kModuleType_Modulator,
+   kModuleType_Pulse,
    kModuleType_Other,
    kModuleType_Unknown
 };
@@ -106,6 +107,7 @@ public:
    ofVec2f GetMinimumDimensions();
    void MarkAsDeleted() { mDeleted = true; }
    bool IsDeleted() const { return mDeleted; }
+   virtual bool ShouldClipContents() { return true; }
    
    virtual void CheckboxUpdated(Checkbox* checkbox) {}
    
