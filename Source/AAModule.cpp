@@ -16,6 +16,9 @@
 #include "ModularSynth.h"
 #include "Profiler.h"
 
+#include "nanovg/nanovg.h"
+#define NANOVG_GLES2_IMPLEMENTATION
+#include "nanovg/nanovg_gl.h"
 
 namespace {
    float map_to(float x, float in_min, float in_max, float out_min, float out_max)
@@ -445,6 +448,55 @@ void AATest::DrawModule()
    for (auto adsr: mAAADSRs) {
       adsr->draw();
    }
+
+   DrawLogo();
+}
+
+void AATest::DrawLogo() 
+{
+   nvgSave(gNanoVG);
+   nvgBeginPath(gNanoVG);
+
+   nvgStrokeColor(gNanoVG, nvgRGBA(243,184,60,255));
+   nvgStrokeWidth(gNanoVG, 8.0);
+
+   nvgTranslate(gNanoVG, 115, 70);
+   nvgScale(gNanoVG, 0.25, 0.25);
+   
+//   M27 10.7  v200
+   nvgMoveTo(gNanoVG, 27, 10.7);
+   nvgLineTo(gNanoVG, 27, 210.7);
+
+//   M27 10.7  l100 200
+   nvgMoveTo(gNanoVG, 27, 10.7);
+   nvgLineTo(gNanoVG, 127, 210.7);
+
+//   M27 10.7  l200 200
+   nvgMoveTo(gNanoVG, 27, 10.7);
+   nvgLineTo(gNanoVG, 227, 210.7);
+
+//   M27 10.7  c82.8 0 150 22.4 150 50
+   nvgMoveTo(gNanoVG, 27, 10.7);
+   nvgBezierTo(gNanoVG, 82.8+27, 10.7, 150+27, 22.4+10.7, 150+27, 50+10.7);
+
+//   M177 60.7 c27.6 0 50 67.2 50 150 l0 0
+   nvgMoveTo(gNanoVG, 177, 60.7);
+   nvgBezierTo(gNanoVG, 27.6+177, 0+60.7, 50+177, 67.2+60.7, 50+177, 150+60.7);
+
+//   M97 140.7 l30-30
+   nvgMoveTo(gNanoVG, 97, 140.7);
+   nvgLineTo(gNanoVG, 30+97, -30+140.7);
+
+//   M97 140.7 c-20 26.7-43.3 36.7-70 30
+   nvgMoveTo(gNanoVG, 97, 140.7);
+   nvgBezierTo(gNanoVG, -20 + 97, 26.7 + 140.7, -43.3 + 97, 36.7 + 140.7, -70 + 97, 30 + 140.7);
+
+   // M177,60.7l20-20
+   nvgMoveTo(gNanoVG, 177, 60.7);
+   nvgLineTo(gNanoVG, 197, 40.7);
+
+   nvgStroke(gNanoVG);
+   nvgRestore(gNanoVG);
 }
  
 void AATest::DrawModuleUnclipped()
