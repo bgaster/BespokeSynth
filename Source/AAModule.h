@@ -404,6 +404,7 @@ private:
    void UpdateADSRDisplays();
 
    void CreateModuleControls();
+   void DrawLogo();
 
    std::string mLabel;
    float mWidth;
