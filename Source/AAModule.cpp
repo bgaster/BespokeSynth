@@ -32,27 +32,33 @@ namespace AAModuleLookup {
       vector<std::pair<string,string>> sAAModuleList;
    }
 
-   void GetAvailableAAModules(vector<string>& modules, bool rescan) {
-      if (rescan) {
+   void GetAvailableAAModules(vector<string>& modules, bool rescan) 
+   {
+      if (rescan) 
+      {
          sAAModuleList.clear();
 
          //TODO: push URL definition to config file
          auto url = std::string("http://127.0.0.1:8000");
          auto modulesJSON = aa_get_modules(url.c_str());
 
-         if (modulesJSON == nullptr) {
+         if (modulesJSON == nullptr) 
+         {
             ofLog() << "Failed to connect to AA server: " << url;
             return;
          }
 
          auto mJSON = ofxJSONElement{std::string{modulesJSON}};
 
-         if (mJSON.isObject()) {
+         if (mJSON.isObject()) 
+         {
             assert(mJSON["modules"].isArray());
-            if (mJSON["modules"].isArray()) {
+            if (mJSON["modules"].isArray()) 
+            {
                auto modules = mJSON["modules"];
 
-               for (auto b = modules.begin(); b != modules.end(); b++) {
+               for (auto b = modules.begin(); b != modules.end(); b++) 
+               {
                   assert((*b)["name"].isString());
                   auto name = (*b)["name"].asString();
 
@@ -63,9 +69,39 @@ namespace AAModuleLookup {
                }
             }
          }
+
+         for (auto m: sAAModuleList)
+         {
+            ofxJSONElement root;
+            root.open(ofToDataPath("internal/seen_aamodules.json"));
+            
+            root[m.first] = m.second;
+
+            root.save(ofToDataPath("internal/seen_aamodules.json"), true);
+         }
+      }
+      else  
+      {
+         auto file = juce::File(ofToDataPath("internal/seen_aamodules.json"));
+         if (file.existsAsFile())
+         {
+            sAAModuleList.clear();
+            ofxJSONElement root;
+            root.open(ofToDataPath("internal/seen_aamodules.json"));
+
+            ofxJSONElement jsonList = root;
+
+            for (auto it = jsonList.begin(); it != jsonList.end(); ++it)
+            {
+               string name = it.key().asString();
+               string json_url = jsonList[name].asString();
+               sAAModuleList.push_back(pair<string,string>(name, json_url));
+            }
+         }
       }
          
-      for (auto m: sAAModuleList) {
+      for (auto m: sAAModuleList) 
+      {
             modules.push_back(m.first);
       }
    }
@@ -523,22 +559,20 @@ void AATest::UpdateADSRDisplays()
 
 void AATest::LoadLayout(const ofxJSONElement& moduleInfo)
 {
-   mModuleSaveData.LoadString("target", moduleInfo);
-   //mModuleSaveData.LoadFloat("vol", moduleInfo, .5, mVolSlider);
-   //mModuleSaveData.LoadEnum<OscillatorType>("osc", moduleInfo, kOsc_Sin, mOscSelector);
-   //mModuleSaveData.LoadFloat("detune", moduleInfo, 1, mDetuneSlider);
-   mModuleSaveData.LoadBool("pressure_envelope", moduleInfo);
-   mModuleSaveData.LoadInt("voicelimit", moduleInfo, -1, -1, kNumVoices);
+   mModuleSaveData.LoadString("aamodule", moduleInfo);
 
    SetUpFromSaveData();
 }
 
 void AATest::SetUpFromSaveData()
 {
+   string name = mModuleSaveData.GetString("aamodule");
+   if (name != "") 
+   {
+      SetModule(name);
+   }
+
    SetTarget(TheSynth->FindModule(mModuleSaveData.GetString("target")));
-   int voiceLimit = mModuleSaveData.GetInt("voicelimit");
-   // if (voiceLimit > 0)
-   //    mPolyMgr.SetVoiceLimit(voiceLimit);
 }
 
 
@@ -586,6 +620,28 @@ void AATest::CheckboxUpdated(Checkbox* checkbox)
 
 void AATest::SetModule(string moduleName) {
    ofLog() << "loading AA Module: " << moduleName;
+
+   mModuleSaveData.SetString("aamodule", moduleName);
+
+   // mark module as used
+   {
+      ofxJSONElement root;
+      root.open(ofToDataPath("internal/used_aamodules.json"));
+      
+      Time time = Time::getCurrentTime();
+      root["aamodules"][moduleName] = (double)time.currentTimeMillis();
+
+      root.save(ofToDataPath("internal/used_aamodules.json"), true);
+   }
+
+   if  (aaModule != nullptr) {
+      return; //  already loaded
+   }
+
+   LoadModule(moduleName);
+}
+
+void AATest::LoadModule(string moduleName) {
 
    for (auto m: AAModuleLookup::sAAModuleList) {
       if (m.first.compare(moduleName) == 0) {

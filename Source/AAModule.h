@@ -393,6 +393,7 @@ public:
    virtual void SetUpFromSaveData() override;
 
    void SetModule(string moduleName);
+   void LoadModule(string moduleName);
 private:
 
    //IDrawableModule
