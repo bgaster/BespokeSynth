@@ -405,7 +405,7 @@ private:
    void UpdateADSRDisplays();
 
    void CreateModuleControls();
-   void DrawLogo();
+   void DrawLogo(float  x,  float y, float scaleX, float scaleY);
 
    std::string mLabel;
    float mWidth;

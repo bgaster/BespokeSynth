@@ -485,10 +485,10 @@ void AATest::DrawModule()
       adsr->draw();
    }
 
-   DrawLogo();
+   DrawLogo(115, 70, 0.25, 0.25);
 }
 
-void AATest::DrawLogo() 
+void AATest::DrawLogo(float  x,  float y, float scaleX, float scaleY) 
 {
    nvgSave(gNanoVG);
    nvgBeginPath(gNanoVG);
@@ -496,8 +496,8 @@ void AATest::DrawLogo()
    nvgStrokeColor(gNanoVG, nvgRGBA(243,184,60,255));
    nvgStrokeWidth(gNanoVG, 8.0);
 
-   nvgTranslate(gNanoVG, 115, 70);
-   nvgScale(gNanoVG, 0.25, 0.25);
+   nvgTranslate(gNanoVG, x, y);
+   nvgScale(gNanoVG, scaleX, scaleY);
    
 //   M27 10.7  v200
    nvgMoveTo(gNanoVG, 27, 10.7);
@@ -560,6 +560,7 @@ void AATest::UpdateADSRDisplays()
 void AATest::LoadLayout(const ofxJSONElement& moduleInfo)
 {
    mModuleSaveData.LoadString("aamodule", moduleInfo);
+   mModuleSaveData.LoadString("target", moduleInfo);
 
    SetUpFromSaveData();
 }
@@ -574,7 +575,6 @@ void AATest::SetUpFromSaveData()
 
    SetTarget(TheSynth->FindModule(mModuleSaveData.GetString("target")));
 }
-
 
 void AATest::DropdownUpdated(DropdownList* list, int oldVal)
 {
