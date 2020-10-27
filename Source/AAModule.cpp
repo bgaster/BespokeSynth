@@ -367,6 +367,306 @@ void AATest::CreateModuleControls() {
             }
          }
       }
+
+       if (mJSONUi["widgets"]["global_midi"].isArray() && mJSONUi["widgets"]["global_midi"] != Json::nullValue) {
+         auto global_midi = mJSONUi["widgets"]["global_midi"];
+
+         for (auto b = global_midi.begin(); b != global_midi.end(); b++) {
+            if ((*b)["midi_toggle"].isObject() && (*b)["midi_toggle"] != Json::nullValue) {
+               auto toggle = (*b)["midi_toggle"];
+               if (toggle["name"].compare("record") == 0) {
+                  assert(toggle["node"].isInt() && toggle["index"].isInt());
+                  int node = toggle["node"].asInt();
+                  int index = toggle["index"].asInt();
+
+                  mRecSysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                     if (r == KEYSTEP_PRO_RECORD_OFF_ON) {
+                        set_param_float(aaModule, node, index, 1.0);
+                     }
+                     else {
+                        set_param_float(aaModule, node, index, 0.0);
+                     }
+                  }));
+               }
+            }
+
+            if ((*b)["midi_off"].isObject() && (*b)["midi_off"] != Json::nullValue) {
+               auto midi_off = (*b)["midi_off"];
+               if (midi_off["name"].compare("stop") == 0) {
+                  assert(midi_off["node"].isInt() && midi_off["index"].isInt());
+                  int node = midi_off["node"].asInt();
+                  int index = midi_off["index"].asInt();
+
+                  mStopSysEx.push_back(std::function<void ()>([=]() { 
+                     set_param_float(aaModule, node, index, 0.0);
+                  }));
+               }
+            }
+
+            if ((*b)["midi_on"].isObject() && (*b)["midi_on"] != Json::nullValue) {
+               auto midi_on = (*b)["midi_on"];
+               if (midi_on["name"].compare("play") == 0) {
+                  assert(midi_on["node"].isInt() && midi_on["index"].isInt());
+                  int node = midi_on["node"].asInt();
+                  int index = midi_on["index"].asInt();
+
+                  mPlaySysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                     if (r == KEYSTEP_PRO_PLAY_OFF_ON) {
+                        set_param_float(aaModule, node, index, 1.0);    
+                     }
+                     else {
+                        // KEYSTEP_PRO_PLAY_PAUSE
+                     }
+                  }));
+               }
+            }
+         }
+       }
+
+      if (mJSONUi["widgets"]["checkboxes"].isArray() && mJSONUi["widgets"]["checkboxes"] != Json::nullValue) {
+         auto checkboxes = mJSONUi["widgets"]["checkboxes"];
+
+         for (auto b = checkboxes.begin(); b != checkboxes.end(); b++) {
+            assert((*b)["label"].isString());
+            auto label = (*b)["label"].asString();
+
+            assert((*b)["init"].isBool());
+            bool init = (*b)["init"].asBool();
+            
+            assert((*b)["node"].isInt() && (*b)["index"].isInt());
+            int node = (*b)["node"].asInt();
+            int index = (*b)["index"].asInt();
+
+            if ((*b)["anchored"].isString()) {
+               auto anchor = toAnchorDirection((*b)["anchored"].asString());
+               if (mAACheckboxes.size() > 0) {
+                  auto checkbox = new AACheckbox(
+                     node, index,
+                     this, label.c_str(), mAACheckboxes[mAACheckboxes.size()-1]->getCheckbox(), anchor, init);
+                  mAACheckboxes.push_back(checkbox);
+                  // finally init param in module
+                  checkbox->setParam(aaModule);
+
+                  // check midi
+                  if ((*b)["midi_toggle"].isObject() && (*b)["midi_toggle"] != Json::nullValue) {
+                     auto toggle = (*b)["midi_toggle"];
+                     if (toggle["name"].compare("record") == 0) {
+                        if (toggle["node"].isInt() && toggle["index"].isInt()) {
+                           int node = toggle["node"].asInt();
+                           int index = toggle["index"].asInt();
+
+                           mRecSysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                              if (r == KEYSTEP_PRO_RECORD_OFF_ON) {
+                                 checkbox->setValue(true); // we do not send to WASM as action seperated
+                                 set_param_float(aaModule, node, index, 1.0);
+                              }
+                              else {
+                                 checkbox->setValue(false);     
+                                 set_param_float(aaModule, node, index, 0.0);
+                              }
+                           }));
+                        }
+                        else {
+                           mRecSysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                              checkbox->setValue(r == KEYSTEP_PRO_RECORD_OFF_ON);
+                           }));
+                        }
+                     }
+                  }
+
+                  if ((*b)["midi_off"].isObject() && (*b)["midi_off"] != Json::nullValue) {
+                     auto midi_off = (*b)["midi_off"];
+                     if (midi_off["name"].compare("stop") == 0) {
+                        if (midi_off["node"].isInt() && midi_off["index"].isInt()) {
+                           int node = midi_off["node"].asInt();
+                           int index = midi_off["index"].asInt();
+
+                           mStopSysEx.push_back(std::function<void ()>([=]() { 
+                              checkbox->setValue(false);     
+                              set_param_float(aaModule, node, index, 0.0);
+                           }));
+                        }
+                        else {
+                           mStopSysEx.push_back(std::function<void ()>([=]() { 
+                              checkbox->setValue(false);     
+                           }));
+                        }
+                     }
+                  }
+
+                  if ((*b)["midi_on"].isObject() && (*b)["midi_on"] != Json::nullValue) {
+                     auto midi_on = (*b)["midi_on"];
+                     if (midi_on["name"].compare("play") == 0) {
+                        if (midi_on["node"].isInt() && midi_on["index"].isInt()) {
+                           int node = midi_on["node"].asInt();
+                           int index = midi_on["index"].asInt();
+
+                           mPlaySysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                              if (r == KEYSTEP_PRO_PLAY_OFF_ON) {
+                                 checkbox->setValue(true); 
+                                 set_param_float(aaModule, node, index, 1.0);    
+                              }
+                              else {
+                                 // KEYSTEP_PRO_PLAY_PAUSE
+                              }
+                           }));
+                        }
+                        else {
+                           mPlaySysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                              if (r == KEYSTEP_PRO_PLAY_OFF_ON) {
+                                 checkbox->setValue(true);  
+                              }
+                              else {
+                                 // KEYSTEP_PRO_PLAY_PAUSE
+                              }
+                           }));
+                        }
+                     }
+                  }
+               }
+            }
+            else {
+               assert((*b)["x"].isInt() && (*b)["y"].isInt());
+               int x = (*b)["x"].asInt();
+               int y = (*b)["y"].asInt();
+               auto checkbox = new AACheckbox(
+                     node, index,
+                     this, label.c_str(), x, y, init);
+               mAACheckboxes.push_back(checkbox);
+               // finally init param in module
+               checkbox->setParam(aaModule);
+
+               // check midi
+               if ((*b)["midi_toggle"].isObject() && (*b)["midi_toggle"] != Json::nullValue) {
+                  auto toggle = (*b)["midi_toggle"];
+                  if (toggle["name"].compare("record") == 0) {
+                     if (toggle["node"].isInt() && toggle["index"].isInt()) {
+                        int node = toggle["node"].asInt();
+                        int index = toggle["index"].asInt();
+
+                        mRecSysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                           if (r == KEYSTEP_PRO_RECORD_OFF_ON) {
+                              checkbox->setValue(true); // we do not send to WASM as action seperated
+                              set_param_float(aaModule, node, index, 1.0);
+                           }
+                           else {
+                              checkbox->setValue(false);     
+                              set_param_float(aaModule, node, index, 0.0);
+                           }
+                        }));
+                     }
+                     else {
+                        mRecSysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                           checkbox->setValue(r == KEYSTEP_PRO_RECORD_OFF_ON);
+                        }));
+                     }
+                  }
+               }
+
+               if ((*b)["midi_off"].isObject() && (*b)["midi_off"] != Json::nullValue) {
+                  auto midi_off = (*b)["midi_off"];
+                  if (midi_off["name"].compare("stop") == 0) {
+                     if (midi_off["node"].isInt() && midi_off["index"].isInt()) {
+                        int node = midi_off["node"].asInt();
+                        int index = midi_off["index"].asInt();
+
+                        mStopSysEx.push_back(std::function<void ()>([=]() { 
+                           checkbox->setValue(false);     
+                           set_param_float(aaModule, node, index, 0.0);
+                        }));
+                     }
+                     else {
+                        mStopSysEx.push_back(std::function<void ()>([=]() { 
+                           checkbox->setValue(false);     
+                        }));
+                     }
+                  }
+               }
+
+               if ((*b)["midi_on"].isObject() && (*b)["midi_on"] != Json::nullValue) {
+                   std::cout << "midi_on" << std::endl;
+                  auto midi_on = (*b)["midi_on"];
+                  if (midi_on["name"].compare("play") == 0) {
+                     if (midi_on["node"].isInt() && midi_on["index"].isInt()) {
+                        int node = midi_on["node"].asInt();
+                        int index = midi_on["index"].asInt();
+
+                        mPlaySysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                           if (r == KEYSTEP_PRO_PLAY_OFF_ON) {
+                              checkbox->setValue(true); 
+                              set_param_float(aaModule, node, index, 1.0);    
+                           }
+                           else {
+                              // KEYSTEP_PRO_PLAY_PAUSE
+                           }
+                        }));
+                     }
+                     else {
+                        mPlaySysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                           if (r == KEYSTEP_PRO_PLAY_OFF_ON) {
+                              checkbox->setValue(true); 
+                           }
+                           else {
+                              // KEYSTEP_PRO_PLAY_PAUSE
+                           }
+                        }));
+                     }
+                  }
+               }
+            }
+         }
+      }
+
+      if (mJSONUi["widgets"]["radio_buttons"].isArray()) {
+         auto radiobuttons = mJSONUi["widgets"]["radio_buttons"];
+
+         for (auto b = radiobuttons.begin(); b != radiobuttons.end(); b++) {
+            assert((*b)["name"].isString() && (*b)["direction"].isString());
+            auto name = (*b)["name"].asString();
+            auto direction = toRadioDirection((*b)["direction"].asString());
+
+            std::vector<std::pair<std::string, std::function<void ()>>> paramsR;
+
+            if ((*b)["buttons"].isArray()) {
+               auto params = (*b)["buttons"];
+
+               for (auto p = params.begin(); p != params.end(); p++) {
+                  assert((*p)["label"].isString());
+                  auto name = (*p)["label"].asString();
+
+                  assert((*p)["node"].isInt() && (*p)["index"].isInt() && (*p)["value"].isDouble());
+                  int node = (*p)["node"].asInt();
+                  int index = (*p)["index"].asInt();
+                  float value = static_cast<float>((*p)["value"].asDouble());
+
+                  auto f = std::function<void ()>([=]() {
+                     set_param_float(aaModule, node, index, value);
+                  });
+                 
+                  paramsR.push_back(std::pair<std::string, std::function<void ()>>{name, f});
+               }
+            }
+
+            if ((*b)["anchored"].isString()) {
+               auto anchor = toAnchorDirection((*b)["anchored"].asString());
+               if (mAARadioButtons.size() > 0) {
+                  auto radiobutton = new AARadioButton(
+                     paramsR, this, name.c_str(), 
+                     mAARadioButtons[mAARadioButtons.size()-1]->getRadioButton(), 
+                     anchor,
+                     direction);
+                  mAARadioButtons.push_back(radiobutton);
+               }
+            }
+            else {
+               assert((*b)["x"].isInt() && (*b)["y"].isInt());
+               int x = (*b)["x"].asInt();
+               int y = (*b)["y"].asInt();
+               auto radiobutton = new AARadioButton(paramsR, this, name.c_str(), x, y, direction);
+               mAARadioButtons.push_back(radiobutton);
+            }
+         }
+      }
    }
 
    UpdateADSRDisplays();
@@ -485,6 +785,16 @@ void AATest::DrawModule()
       adsr->draw();
    }
 
+   // draw checkboxes
+   for (auto c: mAACheckboxes) {
+      c->draw();
+   }
+
+   // draw radio buttons
+   for (auto r: mAARadioButtons) {
+      r->draw();
+   }
+
    DrawLogo(115, 70, 0.25, 0.25);
 }
 
@@ -583,12 +893,11 @@ void AATest::DropdownUpdated(DropdownList* list, int oldVal)
    }
 }
 
-void AATest::RadioButtonUpdated(RadioButton* list, int oldVal)
+void AATest::RadioButtonUpdated(RadioButton* radiobutton, int oldVal)
 {
-   // if (list == mADSRModeSelector)
-   // {
-   //    UpdateADSRDisplays();
-   // }
+   for (auto r: mAARadioButtons) {
+      r->updated(aaModule, radiobutton);
+   }
 }
 
 void AATest::FloatSliderUpdated(FloatSlider* slider, float oldVal)
@@ -616,6 +925,11 @@ void AATest::IntSliderUpdated(IntSlider* slider, int oldVal)
 
 void AATest::CheckboxUpdated(Checkbox* checkbox)
 {
+   for (auto c: mAACheckboxes) {
+      if (c->isCheckbox(checkbox)) {
+         c->setParam(aaModule);
+      }
+   }
 }
 
 void AATest::SetModule(string moduleName) {
@@ -665,14 +979,20 @@ void AATest::LoadModule(string moduleName) {
             if (mNumInputs == 2) {
                if (mNumOutputs == 2) {
                   // two in two out
-                  //TODO: implement two in two out compute
+                  mModuleCompute = [&](int bufferSize, ChannelBuffer* out) {
+                     aa_module_compute_two_two_non(
+                        aaModule, 
+                        bufferSize, 
+                        GetBuffer()->GetChannel(0), GetBuffer()->GetChannel(1),  
+                        out->GetChannel(0), out->GetChannel(1));
+                  };
                }
                else {
                   // two in one out
                   //TODO: implement two in one out compute
                }
             }
-            else {
+            else { // one input 
                if (mNumOutputs == 2) {
                   // one in two out
                   mModuleCompute = [&] (int bufferSize, ChannelBuffer* out) {
@@ -731,5 +1051,65 @@ void AATest::LoadModule(string moduleName) {
          CreateModuleControls();
          return;
       }
+   }
+}
+
+namespace {
+   
+}
+
+// Note: Below is explict support for the KeyStep Pro SysEx messages
+//       This does not effect portablity, but it does mean that without 
+//       KeyStep Pro it is not currently possible to take advantage of 
+//       Stop, Rec, and Play messages.
+// TODO: Find a more generic approach to handling this, in particular, 
+//       define a .json format for controllers incoming SysEx messages with 
+//       a mapping.
+void AATest::SendMidi(const MidiMessage& message) {
+   //std::cout << message.getDescription() << std::endl;
+   if (message.isSysEx()) { 
+      // handle KeyStep Pro SysEx Messages
+      if (message.getSysExDataSize () == KEYSTEP_PRO_SYSEX_MSG_SIZE) {
+         auto bytes = message.getSysExData();
+         //std::cout << message.getDescription() << std::endl;
+         // is it a message from KeyStep ?
+         if (bytes[0] == 0x7F && bytes[1] == 0x7f && bytes[2] == 0x06) {
+            switch (bytes[3]) {
+               case KEYSTEP_PRO_RECORD_OFF_ON: {
+                  for (auto r: mRecSysEx) {
+                     r(KEYSTEP_PRO_RECORD_OFF_ON);
+                  }
+                  break;
+               }
+               case KEYSTEP_PRO_RECORD_ON_OFF: {
+                  for (auto r: mRecSysEx) {
+                     r(KEYSTEP_PRO_RECORD_ON_OFF);
+                  }
+                  break;
+               }
+               case KEYSTEP_PRO_STOP: {
+                  for (auto r: mStopSysEx) {
+                     r();
+                  }
+                  break;
+               }
+               case KEYSTEP_PRO_PLAY_OFF_ON: {
+                  for (auto r: mPlaySysEx) {
+                     r(KEYSTEP_PRO_PLAY_OFF_ON);
+                  }
+                  break;
+               }
+               case KEYSTEP_PRO_PLAY_PAUSE: {
+                  for (auto r: mPlaySysEx) {
+                     r(KEYSTEP_PRO_PLAY_PAUSE);
+                  }
+                  break;
+               }
+            }
+         }
+      }
+   }
+   else if (message.isController()) {
+      // TODO: add CC feature control
    }
 }
