@@ -14,6 +14,7 @@
 #include <vector>
 #include <tuple>
 
+#include "Transport.h"
 #include "IAudioProcessor.h"
 #include "PolyphonyMgr.h"
 #include "SingleOscillatorVoice.h"
@@ -31,6 +32,54 @@
 #include "aa_wasmtime_c.h"
 
 class ofxJSONElement;
+
+class FourTrack 
+{
+public:
+    FourTrack(int x, int y, int w, unsigned int secs) :
+          mX{x}
+        , mY{y}
+        , mWidth{w}
+        , mHeight{160}
+        , mLength{secs}
+        , mPlaying{false}
+        , mPosition{0}
+        , mLoopIn{0}
+        , mLoopOut{0}
+        , mReelRotateAngle{0.0} {
+    }
+
+    
+    void draw();
+
+    void seek(unsigned long long offset) {
+
+    }
+
+    void rewind() {
+        mPosition = 0;
+    }
+
+    void loopIn() {
+        mLoopIn = mPosition;
+    }
+
+    void loopOut() {
+        mLoopOut = mPosition;
+    }
+private:
+    int mX;
+    int mY;
+    int mWidth;
+    int mHeight;
+    bool mPlaying;
+    unsigned long long mLength;
+    unsigned long long mPosition;
+    unsigned long long mLoopIn;
+    unsigned long long mLoopOut;
+    bool mLoop;
+    float mReelRotateAngle;
+};
 
 namespace AAModuleLookup {
     void GetAvailableAAModules(vector<string>& modules, bool rescan);
@@ -523,6 +572,23 @@ private:
     std::vector<std::function<void ()>> mParams;
 };
 
+class AALogo {
+public:
+    AALogo(int x, int y, float scaleX, float scaleY) :
+          mX{x}
+        , mY{y}
+        , mScaleX{scaleX}
+        , mScaleY{scaleY}
+    { }
+
+    void draw();
+private:
+    int mX;
+    int mY;
+    float mScaleX;
+    float mScaleY;
+};
+
 class AATest;
 
 class AATest : public IAudioProcessor, public INoteReceiver, public IDrawableModule, 
@@ -576,7 +642,6 @@ private:
    void UpdateADSRDisplays();
 
    void CreateModuleControls();
-   void DrawLogo(float  x,  float y, float scaleX, float scaleY);
 
    std::string mLabel;
    float mWidth;
@@ -592,6 +657,8 @@ private:
     std::vector<AADropdownList*> mAADropdownLists;
     std::vector<AACheckbox*> mAACheckboxes;
     std::vector<AARadioButton*> mAARadioButtons;
+    std::vector<FourTrack*> mAAFourTracks;
+    AALogo* mLogo;
     
     // Special KeyStep Pro Sys Message handlers
     std::vector<std::function<void (uint8_t)>> mPlaySysEx;
