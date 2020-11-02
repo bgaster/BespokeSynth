@@ -121,6 +121,9 @@ AATest::AATest()
 }
 
 void AATest::CreateModuleControls() {
+   // TODO: This function needs a complete re-write, as it developed as I've developed the 
+   // GUI JSON format and so is not one thing or the other. It needs re-writing to use the 
+   // more formal format.
    if (mJSONUi["widgets"].isObject()) {
       // sliders
       if (mJSONUi["widgets"]["sliders"].isArray()) {
@@ -618,6 +621,51 @@ void AATest::CreateModuleControls() {
          }
       }
 
+      if (mJSONUi["widgets"]["4tracks"].isObject() && mJSONUi["widgets"]["4tracks"] != Json::nullValue) {
+         auto tracks = mJSONUi["widgets"]["4tracks"];
+         assert(tracks["x"].isInt() && tracks["y"].isInt() && tracks["width"].isInt() &&  
+                tracks["time_in_secs"].isInt() && tracks["id"].isInt());
+         unsigned int id = tracks["id"].asInt();
+         int x = tracks["x"].asInt();
+         int y = tracks["y"].asInt();
+         int width = tracks["width"].asInt();
+         int time_in_secs = tracks["time_in_secs"].asInt();
+         auto track = new FourTrack(id, x, y, width, time_in_secs);
+         mAAFourTracks.push_back(track);
+
+         // handle any midi functionlity 
+         if (tracks["midi_toggle"].isArray() && tracks["midi_toggle"] != Json::nullValue) {
+            auto toggles = tracks["midi_toggle"];
+            for (auto m = toggles.begin(); m != toggles.end(); m++) {
+               assert((*m).isString());
+               if ((*m).asString().compare("record") == 0) {
+                  mRecSysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                     if (r == KEYSTEP_PRO_RECORD_OFF_ON) {
+                        track->record(true);
+                     }
+                     else {
+                        track->record(false);
+                     }
+                  }));
+               }
+               else if ((*m).asString().compare("play") == 0) {
+                  mPlaySysEx.push_back(std::function<void (uint8_t)>([=](uint8_t r) { 
+                     if (r == KEYSTEP_PRO_PLAY_OFF_ON) {
+                        track->play(true); 
+                     }
+                     else {
+                     }
+                  }));
+               }
+                else if ((*m).asString().compare("stop") == 0) {
+                  mStopSysEx.push_back(std::function<void ()>([=]() { 
+                     track->stop();
+                  }));
+               }
+            }
+         }
+      }
+
       if (mJSONUi["widgets"]["radio_buttons"].isArray()) {
          auto radiobuttons = mJSONUi["widgets"]["radio_buttons"];
 
@@ -640,11 +688,38 @@ void AATest::CreateModuleControls() {
                   int index = (*p)["index"].asInt();
                   float value = static_cast<float>((*p)["value"].asDouble());
 
-                  auto f = std::function<void ()>([=]() {
-                     set_param_float(aaModule, node, index, value);
-                  });
-                 
-                  paramsR.push_back(std::pair<std::string, std::function<void ()>>{name, f});
+                  bool created = false;
+                  if ((*p)["values"].isArray()) {
+                     auto values = (*p)["values"];
+                     for (auto v = values.begin(); v != values.end(); v++) {
+                        assert((*v)["type"].isString() && (*v)["type"] != Json::nullValue);
+                        if ((*v)["type"].asString().compare("4track") == 0) {
+                           assert((*v)["id"].isInt() && (*v)["id"] != Json::nullValue);
+                           assert((*v)["track"].isInt() && (*v)["track"] != Json::nullValue);
+                           unsigned int id = (*v)["id"].asInt();
+                           unsigned int track = (*v)["track"].asInt();
+                           for (auto t: mAAFourTracks) {                              
+                              if (t->id() == id) {
+                                 auto f = std::function<void ()>([=]() {
+                                    set_param_float(aaModule, node, index, value);
+                                    t->track(track);
+                                 });
+                              
+                                 paramsR.push_back(std::pair<std::string, std::function<void ()>>{name, f});
+                                 created = true;
+                              }
+                           }
+                        }
+                     }
+                  }
+
+                  if (!created) {
+                     auto f = std::function<void ()>([=]() {
+                        set_param_float(aaModule, node, index, value);
+                     });
+                  
+                     paramsR.push_back(std::pair<std::string, std::function<void ()>>{name, f});
+                  }
                }
             }
 
@@ -669,16 +744,7 @@ void AATest::CreateModuleControls() {
          }
       }
 
-      if (mJSONUi["widgets"]["4tracks"].isObject() && mJSONUi["widgets"]["4tracks"] != Json::nullValue) {
-         auto tracks = mJSONUi["widgets"]["4tracks"];
-         assert(tracks["x"].isInt() && tracks["y"].isInt() && tracks["width"].isInt() &&  tracks["time_in_secs"].isInt());
-         int x = tracks["x"].asInt();
-         int y = tracks["y"].asInt();
-         int width = tracks["width"].asInt();
-         int time_in_secs = tracks["time_in_secs"].asInt();
-         auto track = new FourTrack(x, y, width, time_in_secs);
-         mAAFourTracks.push_back(track);
-      }
+      
 
      if (mJSONUi["widgets"]["logo"].isObject() && mJSONUi["widgets"]["logo"] != Json::nullValue) {
          auto logo = mJSONUi["widgets"]["logo"];
@@ -1101,30 +1167,38 @@ void AATest::SendMidi(const MidiMessage& message) {
 // centre real left (85, 55)
 // centre real right (200, 55)
 
+using namespace std::chrono;
 
 void FourTrack::draw() {
-   double msPerBar = TheTransport->MsPerBar();
+   double msPerBarNow = TheTransport->MsPerBar();
 
-   double width = mWidth;
+   // has tempo changed
+   if (msPerBarNow != mMsPerBar) {
+      mMsPerBar = msPerBarNow;
+
+      mNumberOfBars = mWidthInMs / mMsPerBar;
+      mBarInPixels = mWidthInPixels / mNumberOfBars;
+   }
 
    double bars = 10.0;
 
-   double ssPerBar = msPerBar / 1000.0;
-   double samplersPerBar = ssPerBar * gSampleRate;
-   unsigned int pixelsPerBar = static_cast<unsigned int>(width / bars);
+   high_resolution_clock::time_point timeNow = high_resolution_clock::now();
+   if (mPlaying) {
+      auto time_diff_ms = static_cast<double>(duration_cast<milliseconds>(timeNow - mTime).count());
+      mCurrentPosMs += time_diff_ms; 
+      if (mCurrentPosMs > mLengthMs) {
+         mCurrentPosMs = mLengthMs;
+      }
 
-   nvgSave(gNanoVG);
-   
-   nvgBeginPath(gNanoVG);
-   nvgRect(gNanoVG, mX, mY, mWidth, mHeight);
-   nvgFillColor(gNanoVG, nvgRGBA(0,0,0,255));
-   nvgFill(gNanoVG);
+      mOffsetFirstBarToDrawX -= time_diff_ms / mPixelsInMs;
+      
+      if (mOffsetFirstBarToDrawX <= mX) {
+         auto diff = mX - mOffsetFirstBarToDrawX;
+         auto delta = mMsPerBar - time_diff_ms;
+         auto nextBar = delta / mPixelsInMs; 
+         mOffsetFirstBarToDrawX = mX + nextBar;
+      }
 
-   nvgSave(gNanoVG);
-   nvgStrokeColor(gNanoVG, nvgRGBA(255, 255, 255, 255));
-   nvgTranslate(gNanoVG, mX, mY);
-
-   if (mPlaying || true) {
       if (mReelRotateAngle <= 0 ) {
          mReelRotateAngle = 6.28319;
       }
@@ -1132,433 +1206,255 @@ void FourTrack::draw() {
          mReelRotateAngle -= 0.01;
       }
    }
+   mTime = timeNow;
 
    nvgSave(gNanoVG);
       nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 251.9, 86.3);
-      nvgLineTo(gNanoVG, 242.0, 102.4);
-      nvgStrokeWidth(gNanoVG, 1.5);
-      nvgStrokeColor(gNanoVG, nvgRGBA(150, 154, 154, 255));
-      nvgStroke(gNanoVG);
+      nvgRect(gNanoVG, mX, mY, mWidth, mHeight);
+      nvgFillColor(gNanoVG, nvgRGBA(0,0,0,255));
+      nvgFill(gNanoVG);
 
+      nvgStrokeColor(gNanoVG, nvgRGBA(255, 255, 255, 255));
       nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 69.9, 86.9);
-      nvgLineTo(gNanoVG, 79.7, 102.4);
+      for (unsigned int i = 0; i < mNumberOfBars; i++) {
+         float x = mOffsetFirstBarToDrawX + mBarInPixels * static_cast<float>(i);
+
+         if (x < mWidth) {   
+            nvgMoveTo(gNanoVG, x, mY + mHeight - 30);
+            nvgLineTo(gNanoVG, x, mY + mHeight - 50);
+         }
+      }
       nvgStroke(gNanoVG);
 
-      // layer1/Line
-      nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 81.5, 103.3);
-      nvgLineTo(gNanoVG, 93.3, 97.4);
-      nvgStroke(gNanoVG);
+      // draw the design exported from Illustrator as HTML Canvas and conoverted to NanoVG
+      nvgSave(gNanoVG);
+         nvgStrokeColor(gNanoVG, nvgRGBA(255, 255, 255, 255));
+         nvgTranslate(gNanoVG, mX, mY);
 
-      // layer1/Line
-      nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 241.1, 103.3);
-      nvgLineTo(gNanoVG, 225.7, 96.5);
-      nvgStroke(gNanoVG);
+         nvgSave(gNanoVG);
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 251.9, 86.3);
+            nvgLineTo(gNanoVG, 242.0, 102.4);
+            nvgStrokeWidth(gNanoVG, 1.5);
+            nvgStrokeColor(gNanoVG, nvgRGBA(150, 154, 154, 255));
+            nvgStroke(gNanoVG);
 
-      // layer1/Line
-      nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 95.9, 96.5);
-      nvgLineTo(gNanoVG, 160.3, 102.8);
-      nvgStroke(gNanoVG);
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 69.9, 86.9);
+            nvgLineTo(gNanoVG, 79.7, 102.4);
+            nvgStroke(gNanoVG);
 
-      // layer1/Line
-      nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 224.5, 96.5);
-      nvgLineTo(gNanoVG, 162.3, 102.4);
-      nvgStroke(gNanoVG);
-   nvgRestore(gNanoVG);
+            // layer1/Line
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 81.5, 103.3);
+            nvgLineTo(gNanoVG, 93.3, 97.4);
+            nvgStroke(gNanoVG);
 
-   nvgSave(gNanoVG);
-      // rotate reel per movement of tape
-      nvgTranslate(gNanoVG, 85, 55);
-      nvgRotate(gNanoVG, mReelRotateAngle);
-      nvgTranslate(gNanoVG, -85, -55);
+            // layer1/Line
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 241.1, 103.3);
+            nvgLineTo(gNanoVG, 225.7, 96.5);
+            nvgStroke(gNanoVG);
 
-      nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 85.5, 35.6);
-      nvgBezierTo(gNanoVG, 89.0, 35.6, 92.4, 36.6, 95.4, 38.3);
-      nvgLineTo(gNanoVG, 93.6, 41.3);
-      nvgBezierTo(gNanoVG, 96.1, 42.8, 98.2, 44.8, 99.6, 47.3);
-      nvgLineTo(gNanoVG, 102.6, 45.5);
-      nvgBezierTo(gNanoVG, 104.3, 48.5, 105.3, 51.8, 105.4, 55.4);
-      nvgLineTo(gNanoVG, 101.9, 55.5);
-      nvgBezierTo(gNanoVG, 101.9, 58.4, 101.1, 61.2, 99.7, 63.7);
-      nvgLineTo(gNanoVG, 102.7, 65.4);
-      nvgBezierTo(gNanoVG, 101.0, 68.4, 98.4, 70.9, 95.4, 72.7);
-      nvgLineTo(gNanoVG, 93.7, 69.6);
-      nvgBezierTo(gNanoVG, 91.2, 71.1, 88.4, 71.8, 85.5, 71.8);
-      nvgLineTo(gNanoVG, 85.5, 75.3);
-      nvgLineTo(gNanoVG, 85.5, 75.3);
-      nvgBezierTo(gNanoVG, 84.5, 75.3, 83.5, 75.2, 82.5, 75.1);
-      nvgBezierTo(gNanoVG, 80.0, 74.7, 77.7, 73.8, 75.7, 72.7);
-      nvgLineTo(gNanoVG, 77.4, 69.6);
-      nvgBezierTo(gNanoVG, 74.9, 68.2, 72.9, 66.1, 71.4, 63.7);
-      nvgLineTo(gNanoVG, 68.3, 65.4);
-      nvgBezierTo(gNanoVG, 66.6, 62.4, 65.6, 59.1, 65.6, 55.4);
-      nvgLineTo(gNanoVG, 69.1, 55.4);
-      nvgBezierTo(gNanoVG, 69.1, 52.6, 69.8, 49.8, 71.3, 47.3);
-      nvgLineTo(gNanoVG, 68.3, 45.6);
-      nvgBezierTo(gNanoVG, 70.0, 42.6, 72.5, 40.1, 75.5, 38.3);
-      nvgLineTo(gNanoVG, 77.2, 41.3);
-      nvgBezierTo(gNanoVG, 78.8, 40.4, 80.5, 39.7, 82.3, 39.4);
-      nvgBezierTo(gNanoVG, 83.4, 39.2, 84.4, 39.1, 85.4, 39.1);
-      nvgLineTo(gNanoVG, 85.5, 35.6);
-      nvgLineTo(gNanoVG, 85.5, 35.6);
-      nvgClosePath(gNanoVG);
-      nvgStroke(gNanoVG);
-   nvgRestore(gNanoVG);
+            // layer1/Line
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 95.9, 96.5);
+            nvgLineTo(gNanoVG, 160.3, 102.8);
+            nvgStroke(gNanoVG);
 
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 120.5, 55.5);
-   nvgBezierTo(gNanoVG, 120.5, 74.8, 104.8, 90.5, 85.5, 90.5);
-   nvgBezierTo(gNanoVG, 66.2, 90.5, 50.5, 74.8, 50.5, 55.5);
-   nvgBezierTo(gNanoVG, 50.5, 36.2, 66.2, 20.5, 85.5, 20.5);
-   nvgBezierTo(gNanoVG, 104.8, 20.5, 120.5, 36.2, 120.5, 55.5);
-   nvgClosePath(gNanoVG);
-   nvgStroke(gNanoVG);
+            // layer1/Line
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 224.5, 96.5);
+            nvgLineTo(gNanoVG, 162.3, 102.4);
+            nvgStroke(gNanoVG);
+         nvgRestore(gNanoVG);
 
-   nvgSave(gNanoVG);
-      // rotate reel per movement of tape
-      nvgTranslate(gNanoVG, 235, 55);
-      nvgRotate(gNanoVG, mReelRotateAngle);
-      nvgTranslate(gNanoVG, -235, -55);
+         nvgSave(gNanoVG);
+            // rotate reel per movement of tape
+            nvgTranslate(gNanoVG, 85, 55);
+            nvgRotate(gNanoVG, mReelRotateAngle);
+            nvgTranslate(gNanoVG, -85, -55);
 
-      nvgBeginPath(gNanoVG);
-      nvgMoveTo(gNanoVG, 235.5, 35.6);
-      nvgBezierTo(gNanoVG, 239.0, 35.6, 242.4, 36.6, 245.4, 38.3);
-      nvgLineTo(gNanoVG, 243.6, 41.3);
-      nvgBezierTo(gNanoVG, 246.1, 42.8, 248.2, 44.8, 249.6, 47.3);
-      nvgLineTo(gNanoVG, 252.6, 45.5);
-      nvgBezierTo(gNanoVG, 254.3, 48.5, 255.3, 51.8, 255.4, 55.4);
-      nvgLineTo(gNanoVG, 251.9, 55.5);
-      nvgBezierTo(gNanoVG, 251.9, 58.4, 251.1, 61.2, 249.7, 63.7);
-      nvgLineTo(gNanoVG, 252.7, 65.4);
-      nvgBezierTo(gNanoVG, 251.0, 68.4, 248.4, 70.9, 245.4, 72.7);
-      nvgLineTo(gNanoVG, 243.7, 69.6);
-      nvgBezierTo(gNanoVG, 241.2, 71.1, 238.4, 71.8, 235.5, 71.8);
-      nvgLineTo(gNanoVG, 235.5, 75.3);
-      nvgLineTo(gNanoVG, 235.5, 75.3);
-      nvgBezierTo(gNanoVG, 234.5, 75.3, 233.5, 75.2, 232.5, 75.1);
-      nvgBezierTo(gNanoVG, 230.0, 74.7, 227.7, 73.8, 225.7, 72.7);
-      nvgLineTo(gNanoVG, 227.4, 69.6);
-      nvgBezierTo(gNanoVG, 224.9, 68.2, 222.9, 66.1, 221.4, 63.7);
-      nvgLineTo(gNanoVG, 218.3, 65.4);
-      nvgBezierTo(gNanoVG, 216.6, 62.4, 215.6, 59.1, 215.6, 55.4);
-      nvgLineTo(gNanoVG, 219.1, 55.4);
-      nvgBezierTo(gNanoVG, 219.1, 52.6, 219.8, 49.8, 221.3, 47.3);
-      nvgLineTo(gNanoVG, 218.3, 45.6);
-      nvgBezierTo(gNanoVG, 220.0, 42.6, 222.5, 40.1, 225.5, 38.3);
-      nvgLineTo(gNanoVG, 227.2, 41.3);
-      nvgBezierTo(gNanoVG, 228.8, 40.4, 230.5, 39.7, 232.3, 39.4);
-      nvgBezierTo(gNanoVG, 233.4, 39.2, 234.4, 39.1, 235.4, 39.1);
-      nvgLineTo(gNanoVG, 235.5, 35.6);
-      nvgLineTo(gNanoVG, 235.5, 35.6);
-      nvgClosePath(gNanoVG);
-      nvgStroke(gNanoVG);
-   nvgRestore(gNanoVG);
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 85.5, 35.6);
+            nvgBezierTo(gNanoVG, 89.0, 35.6, 92.4, 36.6, 95.4, 38.3);
+            nvgLineTo(gNanoVG, 93.6, 41.3);
+            nvgBezierTo(gNanoVG, 96.1, 42.8, 98.2, 44.8, 99.6, 47.3);
+            nvgLineTo(gNanoVG, 102.6, 45.5);
+            nvgBezierTo(gNanoVG, 104.3, 48.5, 105.3, 51.8, 105.4, 55.4);
+            nvgLineTo(gNanoVG, 101.9, 55.5);
+            nvgBezierTo(gNanoVG, 101.9, 58.4, 101.1, 61.2, 99.7, 63.7);
+            nvgLineTo(gNanoVG, 102.7, 65.4);
+            nvgBezierTo(gNanoVG, 101.0, 68.4, 98.4, 70.9, 95.4, 72.7);
+            nvgLineTo(gNanoVG, 93.7, 69.6);
+            nvgBezierTo(gNanoVG, 91.2, 71.1, 88.4, 71.8, 85.5, 71.8);
+            nvgLineTo(gNanoVG, 85.5, 75.3);
+            nvgLineTo(gNanoVG, 85.5, 75.3);
+            nvgBezierTo(gNanoVG, 84.5, 75.3, 83.5, 75.2, 82.5, 75.1);
+            nvgBezierTo(gNanoVG, 80.0, 74.7, 77.7, 73.8, 75.7, 72.7);
+            nvgLineTo(gNanoVG, 77.4, 69.6);
+            nvgBezierTo(gNanoVG, 74.9, 68.2, 72.9, 66.1, 71.4, 63.7);
+            nvgLineTo(gNanoVG, 68.3, 65.4);
+            nvgBezierTo(gNanoVG, 66.6, 62.4, 65.6, 59.1, 65.6, 55.4);
+            nvgLineTo(gNanoVG, 69.1, 55.4);
+            nvgBezierTo(gNanoVG, 69.1, 52.6, 69.8, 49.8, 71.3, 47.3);
+            nvgLineTo(gNanoVG, 68.3, 45.6);
+            nvgBezierTo(gNanoVG, 70.0, 42.6, 72.5, 40.1, 75.5, 38.3);
+            nvgLineTo(gNanoVG, 77.2, 41.3);
+            nvgBezierTo(gNanoVG, 78.8, 40.4, 80.5, 39.7, 82.3, 39.4);
+            nvgBezierTo(gNanoVG, 83.4, 39.2, 84.4, 39.1, 85.4, 39.1);
+            nvgLineTo(gNanoVG, 85.5, 35.6);
+            nvgLineTo(gNanoVG, 85.5, 35.6);
+            nvgClosePath(gNanoVG);
+            nvgStroke(gNanoVG);
+         nvgRestore(gNanoVG);
 
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 270.5, 55.5);
-   nvgBezierTo(gNanoVG, 270.5, 74.8, 254.8, 90.5, 235.5, 90.5);
-   nvgBezierTo(gNanoVG, 216.2, 90.5, 200.5, 74.8, 200.5, 55.5);
-   nvgBezierTo(gNanoVG, 200.5, 36.2, 216.2, 20.5, 235.5, 20.5);
-   nvgBezierTo(gNanoVG, 254.8, 20.5, 270.5, 36.2, 270.5, 55.5);
-   nvgClosePath(gNanoVG);
-   nvgStroke(gNanoVG);
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 120.5, 55.5);
+         nvgBezierTo(gNanoVG, 120.5, 74.8, 104.8, 90.5, 85.5, 90.5);
+         nvgBezierTo(gNanoVG, 66.2, 90.5, 50.5, 74.8, 50.5, 55.5);
+         nvgBezierTo(gNanoVG, 50.5, 36.2, 66.2, 20.5, 85.5, 20.5);
+         nvgBezierTo(gNanoVG, 104.8, 20.5, 120.5, 36.2, 120.5, 55.5);
+         nvgClosePath(gNanoVG);
+         nvgStroke(gNanoVG);
 
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 160.3, 105.5);
-   nvgLineTo(gNanoVG, 160.3, 150.7);
-   nvgStrokeColor(gNanoVG, nvgRGBA(210, 200, 203, 255));
-   nvgStroke(gNanoVG);
+         nvgSave(gNanoVG);
+            // rotate reel per movement of tape
+            nvgTranslate(gNanoVG, 235, 55);
+            nvgRotate(gNanoVG, mReelRotateAngle);
+            nvgTranslate(gNanoVG, -235, -55);
 
-   // layer1/Rectangle
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 166.3, 102.4);
-   nvgLineTo(gNanoVG, 154.3, 102.4);
-   nvgLineTo(gNanoVG, 154.3, 92.4);
-   nvgLineTo(gNanoVG, 166.3, 92.4);
-   nvgLineTo(gNanoVG, 166.3, 102.4);
-   nvgClosePath(gNanoVG);
-   nvgStrokeColor(gNanoVG, nvgRGBA(252, 253, 254, 255));
-   nvgStroke(gNanoVG);
+            nvgBeginPath(gNanoVG);
+            nvgMoveTo(gNanoVG, 235.5, 35.6);
+            nvgBezierTo(gNanoVG, 239.0, 35.6, 242.4, 36.6, 245.4, 38.3);
+            nvgLineTo(gNanoVG, 243.6, 41.3);
+            nvgBezierTo(gNanoVG, 246.1, 42.8, 248.2, 44.8, 249.6, 47.3);
+            nvgLineTo(gNanoVG, 252.6, 45.5);
+            nvgBezierTo(gNanoVG, 254.3, 48.5, 255.3, 51.8, 255.4, 55.4);
+            nvgLineTo(gNanoVG, 251.9, 55.5);
+            nvgBezierTo(gNanoVG, 251.9, 58.4, 251.1, 61.2, 249.7, 63.7);
+            nvgLineTo(gNanoVG, 252.7, 65.4);
+            nvgBezierTo(gNanoVG, 251.0, 68.4, 248.4, 70.9, 245.4, 72.7);
+            nvgLineTo(gNanoVG, 243.7, 69.6);
+            nvgBezierTo(gNanoVG, 241.2, 71.1, 238.4, 71.8, 235.5, 71.8);
+            nvgLineTo(gNanoVG, 235.5, 75.3);
+            nvgLineTo(gNanoVG, 235.5, 75.3);
+            nvgBezierTo(gNanoVG, 234.5, 75.3, 233.5, 75.2, 232.5, 75.1);
+            nvgBezierTo(gNanoVG, 230.0, 74.7, 227.7, 73.8, 225.7, 72.7);
+            nvgLineTo(gNanoVG, 227.4, 69.6);
+            nvgBezierTo(gNanoVG, 224.9, 68.2, 222.9, 66.1, 221.4, 63.7);
+            nvgLineTo(gNanoVG, 218.3, 65.4);
+            nvgBezierTo(gNanoVG, 216.6, 62.4, 215.6, 59.1, 215.6, 55.4);
+            nvgLineTo(gNanoVG, 219.1, 55.4);
+            nvgBezierTo(gNanoVG, 219.1, 52.6, 219.8, 49.8, 221.3, 47.3);
+            nvgLineTo(gNanoVG, 218.3, 45.6);
+            nvgBezierTo(gNanoVG, 220.0, 42.6, 222.5, 40.1, 225.5, 38.3);
+            nvgLineTo(gNanoVG, 227.2, 41.3);
+            nvgBezierTo(gNanoVG, 228.8, 40.4, 230.5, 39.7, 232.3, 39.4);
+            nvgBezierTo(gNanoVG, 233.4, 39.2, 234.4, 39.1, 235.4, 39.1);
+            nvgLineTo(gNanoVG, 235.5, 35.6);
+            nvgLineTo(gNanoVG, 235.5, 35.6);
+            nvgClosePath(gNanoVG);
+            nvgStroke(gNanoVG);
+         nvgRestore(gNanoVG);
 
-   // layer1/Path
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 160.3, 98.5);
-   nvgLineTo(gNanoVG, 160.3, 102.8);
-   nvgStrokeColor(gNanoVG, nvgRGBA(255, 254, 255, 255));
-   nvgStroke(gNanoVG);
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 270.5, 55.5);
+         nvgBezierTo(gNanoVG, 270.5, 74.8, 254.8, 90.5, 235.5, 90.5);
+         nvgBezierTo(gNanoVG, 216.2, 90.5, 200.5, 74.8, 200.5, 55.5);
+         nvgBezierTo(gNanoVG, 200.5, 36.2, 216.2, 20.5, 235.5, 20.5);
+         nvgBezierTo(gNanoVG, 254.8, 20.5, 270.5, 36.2, 270.5, 55.5);
+         nvgClosePath(gNanoVG);
+         nvgStroke(gNanoVG);
 
-   // layer1/Ellipse
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 162.3, 108.1);
-   nvgBezierTo(gNanoVG, 162.3, 109.6, 161.5, 110.8, 160.5, 110.8);
-   nvgBezierTo(gNanoVG, 159.5, 110.8, 158.7, 109.6, 158.7, 108.1);
-   nvgBezierTo(gNanoVG, 158.7, 106.7, 159.5, 105.5, 160.5, 105.5);
-   nvgBezierTo(gNanoVG, 161.5, 105.5, 162.3, 106.7, 162.3, 108.1);
-   nvgClosePath(gNanoVG);
-   nvgFillColor(gNanoVG, nvgRGBA(01, 178, 227, 255));
-   nvgFill(gNanoVG);
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 160.3, 105.5);
+         nvgLineTo(gNanoVG, 160.3, 150.7);
+         nvgStrokeColor(gNanoVG, nvgRGBA(210, 200, 203, 255));
+         nvgStroke(gNanoVG);
 
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 61.9, 106.1);
-   nvgFillColor(gNanoVG, nvgRGBA(0, 0, 0, 255));
-   nvgFill(gNanoVG);
-   nvgStrokeColor(gNanoVG, nvgRGBA(252, 253, 254, 255));
-   nvgStroke(gNanoVG);
+         // layer1/Rectangle
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 166.3, 102.4);
+         nvgLineTo(gNanoVG, 154.3, 102.4);
+         nvgLineTo(gNanoVG, 154.3, 92.4);
+         nvgLineTo(gNanoVG, 166.3, 92.4);
+         nvgLineTo(gNanoVG, 166.3, 102.4);
+         nvgClosePath(gNanoVG);
+         nvgStrokeColor(gNanoVG, nvgRGBA(252, 253, 254, 255));
+         nvgStroke(gNanoVG);
 
-   // layer1/Ellipse
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 81.5, 102.4);
-   nvgBezierTo(gNanoVG, 81.5, 102.9, 81.1, 103.3, 80.6, 103.3);
-   nvgBezierTo(gNanoVG, 80.1, 103.3, 79.7, 102.9, 79.7, 102.4);
-   nvgBezierTo(gNanoVG, 79.7, 101.9, 80.1, 101.5, 80.6, 101.5);
-   nvgBezierTo(gNanoVG, 81.1, 101.5, 81.5, 101.9, 81.5, 102.4);
-   nvgClosePath(gNanoVG);
-   nvgStroke(gNanoVG);
+         // layer1/Path
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 160.3, 98.5);
+         nvgLineTo(gNanoVG, 160.3, 102.8);
+         nvgStrokeColor(gNanoVG, nvgRGBA(255, 254, 255, 255));
+         nvgStroke(gNanoVG);
 
-   // layer1/Ellipse
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 97.0, 98.6);
-   nvgBezierTo(gNanoVG, 97.0, 99.7, 96.1, 100.6, 95.0, 100.6);
-   nvgBezierTo(gNanoVG, 93.8, 100.6, 92.9, 99.7, 92.9, 98.6);
-   nvgBezierTo(gNanoVG, 92.9, 97.4, 93.8, 96.5, 95.0, 96.5);
-   nvgBezierTo(gNanoVG, 96.1, 96.5, 97.0, 97.4, 97.0, 98.6);
-   nvgClosePath(gNanoVG);
-   nvgStroke(gNanoVG);
+         // layer1/Ellipse
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 162.3, 108.1);
+         nvgBezierTo(gNanoVG, 162.3, 109.6, 161.5, 110.8, 160.5, 110.8);
+         nvgBezierTo(gNanoVG, 159.5, 110.8, 158.7, 109.6, 158.7, 108.1);
+         nvgBezierTo(gNanoVG, 158.7, 106.7, 159.5, 105.5, 160.5, 105.5);
+         nvgBezierTo(gNanoVG, 161.5, 105.5, 162.3, 106.7, 162.3, 108.1);
+         nvgClosePath(gNanoVG);
+         nvgFillColor(gNanoVG, nvgRGBA(01, 178, 227, 255));
+         nvgFill(gNanoVG);
 
-   // layer1/Ellipse
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 240.1, 102.4);
-   nvgBezierTo(gNanoVG, 240.1, 102.9, 240.6, 103.3, 241.1, 103.3);
-   nvgBezierTo(gNanoVG, 241.6, 103.3, 242.0, 102.9, 242.0, 102.4);
-   nvgBezierTo(gNanoVG, 242.0, 101.9, 241.6, 101.5, 241.1, 101.5);
-   nvgBezierTo(gNanoVG, 240.6, 101.5, 240.1, 101.9, 240.1, 102.4);
-   nvgClosePath(gNanoVG);
-   nvgStroke(gNanoVG);
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 61.9, 106.1);
+         nvgFillColor(gNanoVG, nvgRGBA(0, 0, 0, 255));
+         nvgFill(gNanoVG);
+         nvgStrokeColor(gNanoVG, nvgRGBA(252, 253, 254, 255));
+         nvgStroke(gNanoVG);
 
-   // layer1/Ellipse
-   nvgBeginPath(gNanoVG);
-   nvgMoveTo(gNanoVG, 222.5, 98.6);
-   nvgBezierTo(gNanoVG, 222.5, 99.7, 223.4, 100.6, 224.5, 100.6);
-   nvgBezierTo(gNanoVG, 225.7, 100.6, 226.6, 99.7, 226.6, 98.6);
-   nvgBezierTo(gNanoVG, 226.6, 97.4, 225.7, 96.5, 224.5, 96.5);
-   nvgBezierTo(gNanoVG, 223.4, 96.5, 222.5, 97.4, 222.5, 98.6);
-   nvgClosePath(gNanoVG);
-   nvgStroke(gNanoVG);
+         // layer1/Ellipse
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 81.5, 102.4);
+         nvgBezierTo(gNanoVG, 81.5, 102.9, 81.1, 103.3, 80.6, 103.3);
+         nvgBezierTo(gNanoVG, 80.1, 103.3, 79.7, 102.9, 79.7, 102.4);
+         nvgBezierTo(gNanoVG, 79.7, 101.9, 80.1, 101.5, 80.6, 101.5);
+         nvgBezierTo(gNanoVG, 81.1, 101.5, 81.5, 101.9, 81.5, 102.4);
+         nvgClosePath(gNanoVG);
+         nvgStroke(gNanoVG);
 
-   // // layer1/Path
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 160.5, 100.5);
-   // nvgLineTo(gNanoVG, 160.5, 152.6);
-   // nvgStrokeColor(gNanoVG, nvgRGBA(210, 200, 203, 255));
-   // nvgStroke(gNanoVG);
+         // layer1/Ellipse
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 97.0, 98.6);
+         nvgBezierTo(gNanoVG, 97.0, 99.7, 96.1, 100.6, 95.0, 100.6);
+         nvgBezierTo(gNanoVG, 93.8, 100.6, 92.9, 99.7, 92.9, 98.6);
+         nvgBezierTo(gNanoVG, 92.9, 97.4, 93.8, 96.5, 95.0, 96.5);
+         nvgBezierTo(gNanoVG, 96.1, 96.5, 97.0, 97.4, 97.0, 98.6);
+         nvgClosePath(gNanoVG);
+         nvgStroke(gNanoVG);
 
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 166.5, 97.4);
-   // nvgLineTo(gNanoVG, 154.5, 97.4);
-   // nvgLineTo(gNanoVG, 154.5, 87.4);
-   // nvgLineTo(gNanoVG, 166.5, 87.4);
-   // nvgLineTo(gNanoVG, 166.5, 97.4);
-   // nvgClosePath(gNanoVG);
-   // nvgStrokeColor(gNanoVG, nvgRGBA(252, 253, 254, 255));
-   // nvgStroke(gNanoVG);
+         // layer1/Ellipse
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 240.1, 102.4);
+         nvgBezierTo(gNanoVG, 240.1, 102.9, 240.6, 103.3, 241.1, 103.3);
+         nvgBezierTo(gNanoVG, 241.6, 103.3, 242.0, 102.9, 242.0, 102.4);
+         nvgBezierTo(gNanoVG, 242.0, 101.9, 241.6, 101.5, 241.1, 101.5);
+         nvgBezierTo(gNanoVG, 240.6, 101.5, 240.1, 101.9, 240.1, 102.4);
+         nvgClosePath(gNanoVG);
+         nvgStroke(gNanoVG);
 
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 160.5, 93.5);
-   // nvgLineTo(gNanoVG, 160.5, 97.8);
-   // nvgStrokeColor(gNanoVG, nvgRGBA(255, 255, 255, 255));
-   // nvgStroke(gNanoVG);
-
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 162.5, 103.1);
-   // nvgBezierTo(gNanoVG, 162.5, 104.6, 161.7, 105.8, 160.7, 105.8);
-   // nvgBezierTo(gNanoVG, 159.7, 105.8, 158.9, 104.6, 158.9, 103.1);
-   // nvgBezierTo(gNanoVG, 158.9, 101.7, 159.7, 100.5, 160.7, 100.5);
-   // nvgBezierTo(gNanoVG, 161.7, 100.5, 162.5, 101.7, 162.5, 103.1);
-   // nvgClosePath(gNanoVG);
-   // nvgFillColor(gNanoVG, nvgRGBA(101, 178, 227,255));
-   // nvgFill(gNanoVG);
-
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 62.1, 106.1);
-   // nvgFillColor(gNanoVG, nvgRGBA(0, 0, 0,255));
-   // nvgFill(gNanoVG);
-   // nvgFillColor(gNanoVG, nvgRGBA(252, 253, 254,255));
-   // nvgStroke(gNanoVG);
-
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 75.6, 89.4);
-   // nvgBezierTo(gNanoVG, 88.5, 96.5, 160.7, 74.1, 160.7, 74.1);
-   // nvgStroke(gNanoVG);
-
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 245.6, 89.4);
-   // nvgBezierTo(gNanoVG, 232.8, 96.5, 160.6, 74.1, 160.6, 74.1);
-   // nvgStroke(gNanoVG);
-
-   // // layer1/Path
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 154.5, 77.0);
-   // nvgLineTo(gNanoVG, 154.5, 86.2);
-   // nvgStroke(gNanoVG);
-
-   // // layer1/Path
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 166.6, 77.0);
-   // nvgLineTo(gNanoVG, 166.6, 86.2);
-   // nvgStroke(gNanoVG);
-
-   // // layer1/Path
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 160.5, 78.6);
-   // nvgLineTo(gNanoVG, 160.5, 80.0);
-   // nvgStroke(gNanoVG);
-
-   // // layer1/Path
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG, 160.5, 80.9);
-   // nvgLineTo(gNanoVG, 160.5, 82.3);
-   // nvgStroke(gNanoVG);
-
-   nvgRestore(gNanoVG);
-
-   // nvgBeginPath(gNanoVG);
-   // // draw bars
-   // // nvgMoveTo(gNanoVG, mX, mY+mHeight-10);
-   // // nvgLineTo(gNanoVG, mX+mWidth, mY+mHeight-10);
-
-   // nvgStrokeColor(gNanoVG, nvgRGBA(104, 99, 105, 255));
-
-   // // play head
-   // float centreX = (static_cast<float>(mX+mWidth) / 2.0) + 5.0;
-   // nvgMoveTo(gNanoVG, centreX, mY+mHeight-2);
-   // nvgLineTo(gNanoVG, centreX, mY+mHeight-30);
-   // nvgStroke(gNanoVG);
-
-   // nvgBeginPath(gNanoVG);
-   // nvgStrokeColor(gNanoVG, nvgRGBA(129, 125, 126, 255));
-   // nvgMoveTo(gNanoVG, centreX - 6.0, mY+mHeight-46);
-   // nvgLineTo(gNanoVG, centreX - 6.0, mY+mHeight-58);
-   // nvgMoveTo(gNanoVG, centreX + 6.0, mY+mHeight-46);
-   // nvgLineTo(gNanoVG, centreX + 6.0, mY+mHeight-58);
-   // nvgStroke(gNanoVG);
-
-   // // reel left
-   // nvgSave(gNanoVG);
-   // nvgTranslate(gNanoVG, centreX - 95, mY + 30);
-   // nvgScale(gNanoVG, 0.5, 0.5);
-   // // nvgTranslate(gNanoVG, 51.5, 51.3);
-   // // nvgRotate(gNanoVG, mReelRotateAngle); // for animation of wheel
-   // // nvgTranslate(gNanoVG, -51.5, 51.3);
-
-   
-   
-
-   // nvgStrokeWidth(gNanoVG, 6.0);
-
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG,29.5, 0.5);
-   // nvgBezierTo(gNanoVG, 34.7, 0.5, 39.6, 1.9, 43.9, 4.4);
-   // nvgLineTo(gNanoVG, 41.4, 8.8);
-   // nvgBezierTo(gNanoVG, 45.0, 10.9, 48.0, 13.9, 50.1, 17.5);
-   // nvgLineTo(gNanoVG, 54.5, 14.9);
-   // nvgBezierTo(gNanoVG, 57.0, 19.2, 58.4, 24.1, 58.5, 29.4);
-   // nvgLineTo(gNanoVG, 53.4, 29.5);
-   // nvgBezierTo(gNanoVG, 53.4, 33.7, 52.3, 37.8, 50.2, 41.4);
-   // nvgLineTo(gNanoVG, 54.6, 43.9);
-   // nvgBezierTo(gNanoVG, 52.1, 48.3, 48.4, 51.9, 44.0, 54.5);
-   // nvgLineTo(gNanoVG, 41.5, 50.1);
-   // nvgBezierTo(gNanoVG, 37.9, 52.2, 33.8, 53.3, 29.6, 53.3);
-   // nvgLineTo(gNanoVG, 29.6, 58.4);
-   // nvgLineTo(gNanoVG, 29.6, 58.4);
-   // nvgBezierTo(gNanoVG, 28.1, 58.4, 26.6, 58.2, 25.1, 58.0);
-   // nvgBezierTo(gNanoVG, 21.5, 57.4, 18.2, 56.2, 15.2, 54.5);
-   // nvgLineTo(gNanoVG, 17.7, 50.1);
-   // nvgBezierTo(gNanoVG, 14.1, 48.0, 11.1, 45.0, 9.0, 41.4);
-   // nvgLineTo(gNanoVG, 4.5, 43.9);
-   // nvgBezierTo(gNanoVG, 2.0, 39.6, 0.5, 34.7, 0.5, 29.4);
-   // nvgLineTo(gNanoVG, 5.6, 29.4);
-   // nvgBezierTo(gNanoVG, 5.6, 25.2, 6.7, 21.1, 8.8, 17.5);
-   // nvgLineTo(gNanoVG, 4.4, 15.0);
-   // nvgBezierTo(gNanoVG, 6.9, 10.6, 10.6, 7.0, 14.9, 4.4);
-   // nvgLineTo(gNanoVG, 17.5, 8.8);
-   // nvgBezierTo(gNanoVG, 19.8, 7.5, 22.3, 6.5, 24.9, 6.0);
-   // nvgBezierTo(gNanoVG, 26.4, 5.7, 27.9, 5.6, 29.4, 5.6);
-   // nvgLineTo(gNanoVG, 29.5, 0.5);
-   // nvgLineTo(gNanoVG, 29.5, 0.5);
-   // nvgClosePath(gNanoVG);
-
-   // nvgCircle(gNanoVG,  29.5, 28.0, 70.0);
-
-   // nvgStroke(gNanoVG);
-   // nvgRestore(gNanoVG);
-
-   // mReelRotateAngle = 0.0;
-
-   // // reel right
-   // nvgSave(gNanoVG);
-   // // nvgRotate(gNanoVG, mReelRotateAngle); // for animation of wheel
-   // nvgTranslate(gNanoVG, centreX + 65, mY + 30);
-   // nvgScale(gNanoVG, 0.5, 0.5);
-   
-   // nvgStrokeWidth(gNanoVG, 6.0);
-
-   // nvgBeginPath(gNanoVG);
-   // nvgMoveTo(gNanoVG,29.5, 0.5);
-   // nvgBezierTo(gNanoVG, 34.7, 0.5, 39.6, 1.9, 43.9, 4.4);
-   // nvgLineTo(gNanoVG, 41.4, 8.8);
-   // nvgBezierTo(gNanoVG, 45.0, 10.9, 48.0, 13.9, 50.1, 17.5);
-   // nvgLineTo(gNanoVG, 54.5, 14.9);
-   // nvgBezierTo(gNanoVG, 57.0, 19.2, 58.4, 24.1, 58.5, 29.4);
-   // nvgLineTo(gNanoVG, 53.4, 29.5);
-   // nvgBezierTo(gNanoVG, 53.4, 33.7, 52.3, 37.8, 50.2, 41.4);
-   // nvgLineTo(gNanoVG, 54.6, 43.9);
-   // nvgBezierTo(gNanoVG, 52.1, 48.3, 48.4, 51.9, 44.0, 54.5);
-   // nvgLineTo(gNanoVG, 41.5, 50.1);
-   // nvgBezierTo(gNanoVG, 37.9, 52.2, 33.8, 53.3, 29.6, 53.3);
-   // nvgLineTo(gNanoVG, 29.6, 58.4);
-   // nvgLineTo(gNanoVG, 29.6, 58.4);
-   // nvgBezierTo(gNanoVG, 28.1, 58.4, 26.6, 58.2, 25.1, 58.0);
-   // nvgBezierTo(gNanoVG, 21.5, 57.4, 18.2, 56.2, 15.2, 54.5);
-   // nvgLineTo(gNanoVG, 17.7, 50.1);
-   // nvgBezierTo(gNanoVG, 14.1, 48.0, 11.1, 45.0, 9.0, 41.4);
-   // nvgLineTo(gNanoVG, 4.5, 43.9);
-   // nvgBezierTo(gNanoVG, 2.0, 39.6, 0.5, 34.7, 0.5, 29.4);
-   // nvgLineTo(gNanoVG, 5.6, 29.4);
-   // nvgBezierTo(gNanoVG, 5.6, 25.2, 6.7, 21.1, 8.8, 17.5);
-   // nvgLineTo(gNanoVG, 4.4, 15.0);
-   // nvgBezierTo(gNanoVG, 6.9, 10.6, 10.6, 7.0, 14.9, 4.4);
-   // nvgLineTo(gNanoVG, 17.5, 8.8);
-   // nvgBezierTo(gNanoVG, 19.8, 7.5, 22.3, 6.5, 24.9, 6.0);
-   // nvgBezierTo(gNanoVG, 26.4, 5.7, 27.9, 5.6, 29.4, 5.6);
-   // nvgLineTo(gNanoVG, 29.5, 0.5);
-   // nvgLineTo(gNanoVG, 29.5, 0.5);
-   // nvgClosePath(gNanoVG);
-
-   // nvgCircle(gNanoVG,  29.5, 28.0, 70.0);
-
-   // nvgStroke(gNanoVG);
-   // nvgRestore(gNanoVG);
-
-
-   // nvgBeginPath(gNanoVG);
-   // // box above playhead
-   // nvgRect(gNanoVG, centreX - 6.0, mY+mHeight-43, 12, 10);
-   // nvgStroke(gNanoVG);
-
-   // // dot on playhead
-   // nvgBeginPath(gNanoVG);
-   // nvgFillColor(gNanoVG, nvgRGBA(102, 135, 130, 255));
-   // nvgCircle(gNanoVG, centreX, mY+mHeight-25, 3.25);
-   // nvgFill(gNanoVG);
-
+         // layer1/Ellipse
+         nvgBeginPath(gNanoVG);
+         nvgMoveTo(gNanoVG, 222.5, 98.6);
+         nvgBezierTo(gNanoVG, 222.5, 99.7, 223.4, 100.6, 224.5, 100.6);
+         nvgBezierTo(gNanoVG, 225.7, 100.6, 226.6, 99.7, 226.6, 98.6);
+         nvgBezierTo(gNanoVG, 226.6, 97.4, 225.7, 96.5, 224.5, 96.5);
+         nvgBezierTo(gNanoVG, 223.4, 96.5, 222.5, 97.4, 222.5, 98.6);
+         nvgClosePath(gNanoVG);
+         nvgStroke(gNanoVG);
+      nvgRestore(gNanoVG);
    nvgRestore(gNanoVG);
 }
+
+// void FourTrack::OnTimeEvent(double time) {
+//    std::cout << time << std::endl;
+// }
 
 void AALogo::draw() {  
    nvgSave(gNanoVG);

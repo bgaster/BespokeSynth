@@ -9,6 +9,7 @@
 #ifndef __modularSynth__AATest__
 #define __modularSynth__AATest__
 
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <vector>
@@ -33,52 +34,134 @@
 
 class ofxJSONElement;
 
-class FourTrack 
+class FourTrack //: public ITimeListener
 {
 public:
-    FourTrack(int x, int y, int w, unsigned int secs) :
-          mX{x}
+    FourTrack(unsigned int id, int x, int y, int w, double lengthSecs) :
+          mID{id}
+        , mX{x}
         , mY{y}
         , mWidth{w}
         , mHeight{160}
-        , mLength{secs}
+        , mLengthMs{lengthSecs*100}
         , mPlaying{false}
-        , mPosition{0}
+        , mRecording{false}
+        , mActiveTrack{0}
+        , mPosition{0.0}
+        , mCurrentPosMs{0.0}
         , mLoopIn{0}
         , mLoopOut{0}
-        , mReelRotateAngle{0.0} {
+        , mLoop{false}
+        , mStopReceivedLast{false}
+        , mReelRotateAngle{0.0}
+        , mWidthInPixels{static_cast<double>(mWidth)}
+        , mWidthInSec{8.0}
+        , mWidthInMs{mWidthInSec * 1000.0}
+        , mPixelsInMs{mWidthInMs / mWidth}
+        , mOffsetFirstBarToDrawX{static_cast<float>(mX + (mWidth/2))} 
+        , mMsPerBar{TheTransport->MsPerBar()}
+        , mNumberOfBars{mWidthInMs / mMsPerBar}
+        , mBarInPixels{mWidthInPixels / mNumberOfBars} {
+            //TheTransport->AddListener(this, kInterval_64, OffsetInfo(0, true), true);
     }
 
-    
+    ~FourTrack() {
+        //TheTransport->RemoveListener(this);
+        
+    }
+
+    unsigned int id() const {
+        return mID;
+    }
+
+    void track(unsigned int track) {
+        if (0 <= track && track < 4) {
+            mActiveTrack = track;
+        }
+    }
+
+    //void OnTimeEvent(double time) override;
+
     void draw();
 
     void seek(unsigned long long offset) {
 
     }
 
+    void seek_next_bar(bool backwards = false) {
+
+    }
+
+    void play(bool mode) {
+        mPlaying = mode;
+        if (mPlaying) {
+            mTime = std::chrono::high_resolution_clock::now();
+        }
+        mStopReceivedLast = false;
+    }
+
+    void record(bool mode) {
+        mRecording = mode;
+        mStopReceivedLast = false;
+    }
+
+    void stop() {
+        mPlaying = false;
+        mRecording = false;
+        
+        if (mStopReceivedLast) {
+            mCurrentPosMs = 0.0;
+            mPosition = 0;
+            mOffsetFirstBarToDrawX = static_cast<float>(mX + (mWidth/2));
+        }
+
+        mStopReceivedLast = true;
+    }
+
     void rewind() {
         mPosition = 0;
+        mStopReceivedLast = false;
     }
 
     void loopIn() {
         mLoopIn = mPosition;
+        mStopReceivedLast = false;
     }
 
     void loopOut() {
         mLoopOut = mPosition;
+        mStopReceivedLast = false;
     }
 private:
+    unsigned int mID;
     int mX;
     int mY;
     int mWidth;
     int mHeight;
     bool mPlaying;
-    unsigned long long mLength;
-    unsigned long long mPosition;
-    unsigned long long mLoopIn;
-    unsigned long long mLoopOut;
+    bool mRecording;
+    unsigned int mActiveTrack;
+    double mLengthMs;
+    double mPosition;
+    double mCurrentPosMs;
+    double mLoopIn;
+    double mLoopOut;
     bool mLoop;
+    bool mStopReceivedLast;
     float mReelRotateAngle;
+    double mMsPerBar;
+    double mMsTillNextBar;
+
+    double mWidthInPixels;
+    double mWidthInSec;
+    double mWidthInMs;
+    double mPixelsInMs;
+    float mOffsetFirstBarToDrawX;
+    double mOffsetFirstBarToDrawXMs;
+    double mNumberOfBars;
+    double mBarInPixels;
+
+    std::chrono::high_resolution_clock::time_point mTime;
 };
 
 namespace AAModuleLookup {
